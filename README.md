@@ -106,4 +106,8 @@ Documented in `docs/GAP-ANALYSIS.md`; forward plan in `docs/ROADMAP.md`. Summary
 
 ## Legal
 
-For authorized security research, CTF use, and education. Users are responsible for compliance with applicable law and the terms of service of every queried data source. The authors provide no warranty.
+For authorized security research, CTF use, and education. Users are responsible for compliance with applicable law and the terms of service of every queried data source.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
