@@ -1,0 +1,99 @@
+import { useMemo, useState } from 'react'
+import { marked } from 'marked'
+import { useCaseFile } from '../store/casefile'
+import { buildReport, printHtml } from '../engine/report'
+import { aiExecutiveSummary, getStoredKey } from '../api/ai'
+
+export default function ReportModal({ initialMode = 'analyst', onClose }) {
+  const [mode, setMode] = useState(initialMode)
+  const [busy, setBusy] = useState(false)
+  const caseName = useCaseFile((s) => s.caseName)
+  const nodes = useCaseFile((s) => s.nodes)
+  const edges = useCaseFile((s) => s.edges)
+  const log = useCaseFile((s) => s.log)
+  const aiNarrative = useCaseFile((s) => s.aiNarrative)
+
+  const markdown = useMemo(
+    () => buildReport({ caseName, nodes, edges, log, aiNarrative }, mode),
+    [caseName, nodes, edges, log, aiNarrative, mode]
+  )
+  const html = useMemo(() => marked.parse(markdown), [markdown])
+
+  function download() {
+    const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${(caseName || 'case').replace(/[^a-z0-9_-]+/gi, '_')}${mode === 'ctf' ? '.writeup' : '.report'}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+    useCaseFile.getState().pushLog('Report downloaded as Markdown', 'ok')
+  }
+
+  function printPdf() {
+    printHtml(html, caseName || 'OSINT Report')
+    useCaseFile.getState().pushLog('Print dialog opened — choose "Save as PDF"', 'ok')
+  }
+
+  async function generateAiSummary() {
+    const key = getStoredKey()
+    if (!key) {
+      useCaseFile.getState().pushLog('Set your Anthropic API key in Settings first (gear icon)', 'warn')
+      return
+    }
+    setBusy(true)
+    const tid = useCaseFile.getState().addTask('AI summary')
+    try {
+      const stats = {}
+      for (const n of nodes) stats[n.data.kind] = (stats[n.data.kind] || 0) + 1
+      const sample = nodes.map((n) => ({
+        kind: n.data.kind,
+        label: n.data.label,
+        evidenceCount: n.data.evidence?.length || 0,
+      }))
+      const text = await aiExecutiveSummary({
+        caseName,
+        stats,
+        entitiesSample: sample,
+        apiKey: key,
+      })
+      useCaseFile.getState().setAiNarrative(text)
+      useCaseFile.getState().pushLog('AI executive summary generated', 'ok')
+    } catch (e) {
+      useCaseFile.getState().pushLog(`AI summary failed — ${e.message}`, 'err')
+    } finally {
+      useCaseFile.getState().endTask(tid)
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal report" onClick={(e) => e.stopPropagation()}>
+        <div className="report-head">
+          <div className="btn-row" style={{ margin: 0 }}>
+            <button className={mode === 'analyst' ? 'tab active' : 'tab'} onClick={() => setMode('analyst')}>
+              Analyst report
+            </button>
+            <button className={mode === 'ctf' ? 'tab active' : 'tab'} onClick={() => setMode('ctf')}>
+              CTF writeup
+            </button>
+          </div>
+          <button className="danger" onClick={onClose}>Close</button>
+        </div>
+
+        <div className="report-body">
+          <div className="report-preview" dangerouslySetInnerHTML={{ __html: html }} />
+        </div>
+
+        <div className="report-actions">
+          <button onClick={generateAiSummary} disabled={busy}>
+            {busy ? 'Thinking…' : aiNarrative ? 'Regenerate AI summary' : 'Generate AI summary'}
+          </button>
+          <button onClick={download}>Download .md</button>
+          <button onClick={printPdf}>Print / Save PDF</button>
+        </div>
+      </div>
+    </div>
+  )
+}
