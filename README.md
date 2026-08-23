@@ -204,14 +204,6 @@ For **authorized research, CTFs, learning, and checking your own exposure only**
 
 ---
 
-### Tags / Keywords
-
-`osint` `recon` `osint-tool` `ctf` `security` `investigation` `graph` `browser-only` `privacy` `no-backend` `pwa` `react` `vite` `tailwindcss` `shadcn-ui` `lenis` `indexeddb` `certificate-transparency` `whois` `dns` `dns-investigation` `ttl` `wayback-machine` `exif` `breach` `exposure` `haveibeenpwned` `xposedornot` `hudson-rock` `infostealer` `phone-number-lookup` `phone-intel` `libphonenumber` `personal-osint`
-
-Add these as **GitHub Topics** (Repo → Settings → Topics) to help people find it.
-
----
-
 ### License
 
 **MIT** — see [LICENSE](LICENSE). Free to use, copy, and learn from.
