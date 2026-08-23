@@ -83,7 +83,7 @@ export function nextMoves(nodes) {
           nodeId: n.id,
           module: 'exposure',
           title: `Exposure check for ${label.slice(0, 24)}`,
-          reason: kind === 'email' ? 'Check if this address appears in public breach data (private, no passwords shown)' : kind === 'phone' ? 'Phone exposure requires HIBP key — will explain provider limits' : kind === 'image' ? 'Hash image locally and check exposure (no upload)' : `Check if this ${kind} has known public exposure`,
+          reason: kind === 'email' ? 'Check if this address appears in public breach data (private, no passwords shown)' : kind === 'phone' ? 'Key-free phone intel: validity, carrier, line type + one-click pivots' : kind === 'image' ? 'Hash image locally and check exposure (no upload)' : `Check if this ${kind} has known public exposure`,
         })
       }
     }

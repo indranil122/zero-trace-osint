@@ -34,7 +34,7 @@ export default function Settings({ onClose }) {
           Without a key, everything except AI correlation &amp; summaries still works.
         </p>
         <label className="field" style={{ marginTop: 12 }}>
-          <span>HIBP API key (optional, for username/phone breach checks)</span>
+          <span>HIBP API key (optional — email fallback only)</span>
           <input
             type="password"
             value={hibpKey}
@@ -43,7 +43,11 @@ export default function Settings({ onClose }) {
           />
         </label>
         <p className="dim">
-          For email, we use XposedOrNot (no key, CORS-open). HIBP checks for username/phone/domain (and fallback for email) require a BYO key <em>and</em> a server-side proxy — browsers block the <code>haveibeenpwned.com</code> API directly (no CORS, forbidden headers). With this build (browser-only) those paths will show “provider unavailable”; verify manually at haveibeenpwned.com or run behind a proxy you control. Never displays passwords.
+          <strong>Everything works without any key:</strong> email breaches + analytics via XposedOrNot,
+          infostealer-log checks via Hudson Rock, domain breach catalogs via HIBP&apos;s public endpoint
+          (with XposedOrNot fallback), and full phone intel — offline parsing, carrier lookup and one-click
+          pivot searches. The HIBP key above only adds an extra email-breach fallback, and note their API
+          blocks browsers by design, so it may still show &ldquo;provider unavailable&rdquo; without a proxy you control.
         </p>
         <div className="btn-row">
           <button

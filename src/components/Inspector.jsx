@@ -173,7 +173,8 @@ export default function Inspector() {
                 const bDate = ev.breachDate || ev.meta?.breachDate || ''
                 const dClasses = ev.dataClasses || ev.meta?.dataClasses || ''
                 const hash = ev.hash || ev.meta?.hash || ''
-                const statusColor = status === 'confirmed' ? '#ef4444' : status === 'possible' ? '#f59e0b' : status === 'no_result' ? '#10b981' : '#6b7280'
+                const statusColor = status === 'confirmed' ? '#ef4444' : status === 'possible' ? '#f59e0b' : status === 'no_result' ? '#10b981' : status === 'intel' ? '#3b82f6' : '#6b7280'
+                const links = ev.meta?.links || []
                 return (
                   <div key={`exp-${i}`} className="ev-item" style={{ borderLeftColor: statusColor }}>
                     <div className="ev-top">
@@ -186,10 +187,30 @@ export default function Inspector() {
                       {sev && <span className="dns-tag">Severity: {sev}</span>}
                       {conf && <span className="dns-tag">Confidence: {conf}</span>}
                       {bName && <span className="dns-tag">Breach: {bName}</span>}
+                      {(ev.riskLabel || ev.meta?.riskLabel) && <span className="dns-tag">Risk: {ev.riskLabel || ev.meta?.riskLabel}</span>}
+                      {(ev.lineType || ev.meta?.lineType) && <span className="dns-tag">Line: {ev.lineType || ev.meta?.lineType}</span>}
+                      {(ev.carrier || ev.meta?.carrier) && <span className="dns-tag">Carrier: {ev.carrier || ev.meta?.carrier}</span>}
                     </div>
                     {bDate && <p className="dim" style={{ fontSize: '11px' }}>Incident: {String(bDate).slice(0, 10)}</p>}
                     {dClasses && <p className="dim" style={{ fontSize: '11px', wordBreak: 'break-word' }}>Exposed data: {String(dClasses).slice(0, 120)}</p>}
                     {hash && <p className="dim" style={{ fontSize: '11px', wordBreak: 'break-all' }}>Hash: {String(hash).slice(0, 24)}…</p>}
+                    {links.length > 0 && (
+                      <div className="dns-meta" style={{ marginTop: 8 }}>
+                        {links.map((l) => (
+                          <a
+                            key={l.name}
+                            className="dns-tag"
+                            href={l.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            title={l.note || l.name}
+                            style={{ textDecoration: 'none' }}
+                          >
+                            {l.name} ↗
+                          </a>
+                        ))}
+                      </div>
+                    )}
                     {ev.url && <a href={ev.url} target="_blank" rel="noreferrer">verify source ↗</a>}
                     <p className="dim" style={{ fontSize: '11px', marginTop: 4, fontStyle: 'italic' }}>Never shows passwords/tokens. Verify at original breach source.</p>
                   </div>

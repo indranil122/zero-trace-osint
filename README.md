@@ -55,7 +55,7 @@ Same core, same privacy — just more complete.
 | **Wayback** | Finds old pages and subdomains | Archived URLs |
 | **Username hunt** | Checks 5 platforms where browser allows | GitHub, GitLab, Reddit, npm, Keybase |
 | **Email** | Finds contact emails via RDAP and checks if a Gravatar is associated with the email address hash | `jdoe@example.com` → hash `5d4140…` → avatar? |
-| **Email / Phone / Username / Domain / Name** | **Exposure check** — was this in a public breach? | See below |
+| **Email / Phone / Username / Domain / Name** | **Exposure check** — breaches + infostealer logs (email/username/domain) and full phone intel with pivots — all key-free | See below |
 | **Image drop** | Reads camera, date, GPS **locally** — never uploads. For exposure, we hash the image locally and point you to check the hash yourself. | EXIF stays on device, SHA-256 shown |
 | **Correlate** | Links overlap (same IP, same handle, same breach) | `High/Medium` confidence + reason |
 | **AI (optional)** | Claude pass for fuzzy matches + summary | Needs your own Anthropic key |
@@ -79,19 +79,25 @@ We clearly say which one it is:
 - **Confirmed exposure** — provider says this exact value was in a breach
 - **Possible match** — name/phone is not unique, or breach affects domain broadly
 - **No result** — provider says no known breach for this value
-- **Provider unavailable** — CORS/network blocked or needs a key — we tell you how to check manually
+- **Intel** — context gathered (risk scores, carrier info, pivots) that isn't a breach verdict
+- **Provider unavailable** — CORS/network blocked — we tell you how to check manually
 
-**How it works, honestly:**
+**How it works — everything below is key-free:**
 
-- **Email** — tries `api.xposedornot.com` (free, works in browser, no key). HIBP fallback (if you add a key in Settings) requires a server-side proxy — browsers block `haveibeenpwned.com` directly — so it will usually show `provider unavailable` in this browser-only build; verify manually if so.
-- **Domain** — public `haveibeenpwned.com/api/v3/breaches?domain=` is also browser-blocked; without a proxy the check returns `provider unavailable` (BYO key improves rate limits only behind a proxy). Shows breaches that list this domain when reachable.
-- **Username / Phone** — require HIBP BYO key <em>and</em> a server-side proxy — browsers block the API. Without a proxy, we show `provider unavailable` with guidance — we don’t fake.
+- **Email** — three providers in parallel, all free & CORS-open: `XposedOrNot` breach check + **breach analytics** (risk label, exposed data types, paste count), plus `Hudson Rock` **infostealer-log check** (was this mailbox on an infected computer?). HIBP fallback if you add a key in Settings.
+- **Username** — `Hudson Rock` stealer-log search (free, no key): does this handle appear on machines owned by infostealers? HIBP-style catalogs need a server proxy (their API blocks browsers by design) — we say so instead of faking it.
+- **Domain** — HIBP's public breach catalog filtered by domain (`Access-Control-Allow-Origin: *`, verified), with XposedOrNot's catalog as automatic fallback.
+- **Phone** — full **Phone Intel**, zero keys:
+  1. Offline parse via libphonenumber — validity, country, line type (mobile/VoIP/fixed), all formats
+  2. Live enrichment via phone-number-api.com — **carrier, region, timezone, disposable-number flag**
+  3. One-click pivot searches — Truecaller, Sync.me, WhatsApp probe, Google/Bing/DDG/Yandex dorks across every format variant, DeHashed leak search
+  - No free API exposes phone-breach data from a browser — we give you the manual-check links instead of fake results.
 - **Image** — we compute `SHA-256` locally in your browser, show the hash, and link to check it yourself on VirusTotal. **Image never leaves your device.**
 - Respects CORS and provider limits. No shady proxies. No fake results.
 
-Findings go straight into your graph: `email → exposed-in → Breach` (red `🔓` node), with evidence that includes status, confidence, severity. Next Moves will suggest it, Inspector explains it, and Reports include an **Exposure Intelligence** section.
+Findings go straight into your graph: `email → exposed-in → Breach` (red `🔓` node), with evidence that includes status, confidence, severity. Next Moves will suggest it, Inspector explains it — phone pivots render as clickable chips right inside the Inspector. Reports include an **Exposure Intelligence** section.
 
-Add your HIBP key in **Settings → HIBP API key** (stored only in `localStorage`, sent only to `haveibeenpwned.com`).
+Keys are optional extras (Anthropic for AI, HIBP for an extra email fallback) — stored only in `localStorage`.
 
 ---
 
@@ -168,7 +174,7 @@ Just drag `dist/` or `npm run build` on the host.
 
 ```
 src/
-  api/        talks to public sources (dns with TTL/resolver, rdap, crtsh, wayback, username, exif, gravatar, exposure via XposedOrNot/HIBP, ai)
+  api/        talks to public sources (dns with TTL/resolver, rdap, crtsh, wayback, username, exif, gravatar, exposure via XposedOrNot/Hudson Rock/HIBP + phone intel via libphonenumber & pivots, ai)
   engine/     plain logic: linking rules (incl. exposed-in), next-step suggestions (incl. exposure), timeline, reports (incl. Exposure Intelligence)
   store/      one Zustand store + IndexedDB (cases, incl. breach nodes, 50-step undo)
   workers/    crt.sh parsing off the main thread
@@ -183,9 +189,10 @@ A node is `kind:value` (like `domain:example.com` or `breach:Collection #1`) so 
 ### Honest limits
 
 - Username check = **5 platforms** (browser CORS limit; more needs a tiny proxy — planned)
-- **Exposure**: Email via XposedOrNot works without a key (browser-open). All HIBP-based checks (email fallback, domain, username, phone) need a BYO key **and** a server-side proxy — this browser-only build has no proxy, so they return `provider unavailable`; verify manually at haveibeenpwned.com or xposedornot.com. We never fake.
+- **Exposure**: email (XposedOrNot + Hudson Rock), domain (HIBP public catalog + XON fallback), and full phone intel (offline parse, carrier lookup, pivots) all work key-free. HIBP's authenticated APIs block browsers by design (no CORS for keyed endpoints), so the optional HIBP email fallback and username-level catalogs may show `provider unavailable` — we never fake.
 - PDF is via your browser’s Print dialog (lightweight)
 - If `crt.sh` is blocked, we try 5 routes + show a clear message — try **DNS** or **Wayback** for subdomains instead
+- Phone live-carrier lookups: free tier is 5/minute; offline analysis always works regardless
 
 Details: `docs/GAP-ANALYSIS.md` → `docs/ROADMAP.md`.
 
@@ -199,7 +206,7 @@ For **authorized research, CTFs, learning, and checking your own exposure only**
 
 ### Tags / Keywords
 
-`osint` `recon` `osint-tool` `ctf` `security` `investigation` `graph` `browser-only` `privacy` `no-backend` `pwa` `react` `vite` `tailwindcss` `shadcn-ui` `lenis` `indexeddb` `certificate-transparency` `whois` `dns` `dns-investigation` `ttl` `wayback-machine` `exif` `breach` `exposure` `haveibeenpwned` `xposedornot` `personal-osint`
+`osint` `recon` `osint-tool` `ctf` `security` `investigation` `graph` `browser-only` `privacy` `no-backend` `pwa` `react` `vite` `tailwindcss` `shadcn-ui` `lenis` `indexeddb` `certificate-transparency` `whois` `dns` `dns-investigation` `ttl` `wayback-machine` `exif` `breach` `exposure` `haveibeenpwned` `xposedornot` `hudson-rock` `infostealer` `phone-number-lookup` `phone-intel` `libphonenumber` `personal-osint`
 
 Add these as **GitHub Topics** (Repo → Settings → Topics) to help people find it.
 

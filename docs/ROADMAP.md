@@ -22,9 +22,13 @@
 Still open from v1.1:
 - [ ] True PDF file generation (print-dialog flow remains; jsPDF intentionally not added)
 
-## v1.2 candidates (depth)
-- [ ] HIBP breach lookup behind BYO key (like the Claude key pattern)
-- [ ] Optional Cloudflare Worker relay → unlocks Sherlock-scale username enumeration + removes CORS-proxy dependence for crt.sh
+## v1.2 (shipped)
+- [x] Exposure upgrade — all key-free: XposedOrNot breach check + analytics (risk label, data types, paste count), Hudson Rock infostealer-log checks for email & username, HIBP public domain-catalog with XposedOrNot fallback
+- [x] Phone Intel module (`api/phone.js`) — offline libphonenumber parse (validity, country, line type, formats), live carrier/timezone/disposable enrichment via phone-number-api.com, one-click pivot deep-links (Truecaller, Sync.me, WhatsApp, multi-format Google/Bing/DDG/Yandex dorks, DeHashed)
+- [x] `intel` status in evidence chain; pivot links render as clickable chips in Inspector
+
+Still open from v1.2:
+- [ ] Optional Cloudflare Worker relay → unlocks Sherlock-scale username enumeration + removes CORS-proxy dependence for crt.sh + enables keyed HIBP calls server-side
 - [ ] More username platforms via the relay
 - [ ] GitHub enrichment: commit-email harvesting, org membership
 - [ ] Shareable read-only case links encoded entirely in the URL fragment (still server-less)

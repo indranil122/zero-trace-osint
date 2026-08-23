@@ -152,10 +152,10 @@ export default function Sidebar() {
                     <option value="name">Name</option>
                     <option value="image">Image hash</option>
                   </select>
-                  <Input value={exposureValue} placeholder={exposureKind === 'email' ? 'you@example.com' : exposureKind === 'phone' ? '+1…' : exposureKind === 'domain' ? 'example.com' : 'value'} onChange={(e) => setExposureValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleExposure()} className="h-8 flex-1" />
+                  <Input value={exposureValue} placeholder={exposureKind === 'email' ? 'you@example.com' : exposureKind === 'phone' ? '+919876543210' : exposureKind === 'domain' ? 'example.com' : 'value'} onChange={(e) => setExposureValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleExposure()} className="h-8 flex-1" />
                 </div>
                 <Button size="sm" className="w-full h-7 bg-black text-white hover:bg-black/90 text-xs" onClick={handleExposure}>Check exposure →</Button>
-                <p className="text-[10px] leading-relaxed text-muted-foreground">Statuses: confirmed / possible / no result / provider unavailable. Image hash is local — never uploaded. Add HIBP key in ⚙ for username/phone/domain.</p>
+                <p className="text-[10px] leading-relaxed text-muted-foreground">Statuses: confirmed / possible / no result / intel / provider unavailable. Everything runs key-free: email + stealer logs (Hudson Rock), domain catalogs, phone intel &amp; pivots. No passwords ever shown.</p>
               </CardContent>
             </Card>
           </TabsContent>

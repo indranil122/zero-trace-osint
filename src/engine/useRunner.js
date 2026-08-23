@@ -49,7 +49,7 @@ export function useRunner() {
         const meta = findings.find((f) => f.meta?.status)
         if (meta) {
           const status = meta.meta.status
-          const label = status === 'confirmed' ? 'exposure confirmed' : status === 'possible' ? 'possible match' : status === 'no_result' ? 'no exposure found' : 'provider unavailable'
+          const label = status === 'confirmed' ? 'exposure confirmed' : status === 'possible' ? 'possible match' : status === 'no_result' ? 'no exposure found' : status === 'intel' ? 'intel gathered' : 'provider unavailable'
           pushLog(`${mod.label}: ${label} — ${meta.detail.slice(0, 80)}`, status === 'confirmed' ? 'warn' : status === 'provider_unavailable' ? 'warn' : 'ok')
         } else {
           pushLog(`${mod.label}: done — ${linked} linked finding(s)`, 'ok')

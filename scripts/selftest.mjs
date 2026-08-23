@@ -276,13 +276,40 @@ console.log('\n[10] encrypted vault roundtrip')
     assert.ok(rejected)
   })
 
-  // Exposure module — browser-first, no network for phone
-  const phoneFindings = await exposureScan({ kind: 'phone', value: '+1 (555) 123-4567' })
-  check('phone exposure returns provider_unavailable without leaking', () => {
-    assert.ok(phoneFindings.some((f) => f.meta?.status === 'provider_unavailable'))
-    assert.ok(!phoneFindings.some((f) => f.detail.toLowerCase().includes('password:')))
+  // Exposure module — phone intel works offline (fetch stubbed, no network in tests)
+  const { _setFetcher } = await import('../src/api/phone.js')
+  _setFetcher(async () => ({
+    ok: true,
+    status: 200,
+    json: async () => ({
+      status: 'success',
+      numberType: 'MOBILE',
+      numberValid: true,
+      isDisposible: false,
+      formatE164: '+919876543210',
+      carrier: 'Airtel',
+      countryName: 'India',
+      timezone: 'Asia/Calcutta',
+      city: null,
+      regionName: null,
+    }),
+  }))
+  const phoneFindings = await exposureScan({ kind: 'phone', value: '+91 98765 43210' })
+  check('phone intel returns offline parse + live enrichment + pivots', () => {
+    const sources = phoneFindings.map((f) => f.source)
+    assert.ok(sources.some((s) => s.includes('Phone Intel')), `sources: ${sources}`)
+    assert.ok(phoneFindings.some((f) => f.meta?.lineType === 'MOBILE' && f.meta?.country === 'IN'))
+    assert.ok(phoneFindings.some((f) => f.meta?.carrier === 'Airtel'))
+    assert.ok(phoneFindings.some((f) => Array.isArray(f.meta?.links) && f.meta.links.length >= 8))
+    assert.ok(!phoneFindings.some((f) => String(f.detail).toLowerCase().includes('password:')))
   })
-  const domainFindings = await exposureScan({ kind: 'phone', value: 'not-a-phone' })
+  const invalidPhone = await exposureScan({ kind: 'phone', value: 'not-a-phone' })
+  check('invalid phone explains itself without lookups', () => {
+    assert.ok(Array.isArray(invalidPhone) && invalidPhone.length === 1)
+    assert.equal(invalidPhone[0].meta?.status, 'no_result')
+    assert.ok(invalidPhone[0].detail.includes('does not parse'))
+  })
+  const domainFindings = await exposureScan({ kind: 'phone', value: '12345' })
   check('exposure handles any phone string gracefully', () => {
     assert.ok(Array.isArray(domainFindings) && domainFindings.length > 0)
   })

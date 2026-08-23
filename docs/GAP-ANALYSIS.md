@@ -59,7 +59,7 @@ Audit date: 2026-08-22. Each issue is pinned to its location in the codebase, ra
 
 ## Still open (accepted limitations, see ROADMAP.md)
 - Username hunt covers 5 CORS-open platforms (Sherlock-class coverage needs a proxy worker)
-- HIBP breach lookup absent (requires paid key; BYO-key design sketched in roadmap)
+- HIBP breach lookup for email covered key-free via XposedOrNot (+ Hudson Rock stealer logs); HIBP's own keyed API remains proxy-only (no CORS by policy)
 - True PDF generation still uses the browser print dialog (v1.1 shipped PNG graph export instead; jsPDF deliberately not added to keep the bundle lean)
 - No component/E2E tests; only engine-level self-tests
 
