@@ -110,9 +110,9 @@ export function buildPhonePivots(parsed) {
   const orQuery = fmts.map((f) => `"${f}"`).join(' OR ')
 
   const links = [
-    { name: 'Truecaller', url: `https://www.truecaller.com/search/${cc || 'in'}/${nationalNoLeadingZero}`, note: 'Crowdsourced caller ID / name' },
+    { name: 'Truecaller', url: cc ? `https://www.truecaller.com/search/${cc}/${nationalNoLeadingZero}` : '', note: 'Crowdsourced caller ID / name' },
     { name: 'Sync.me', url: `https://sync.me/search/?number=${encodeURIComponent(e164)}`, note: 'Reverse phone lookup' },
-    { name: 'WhatsApp', url: `https://wa.me/${e164}`, note: 'Registered on WhatsApp? opens chat draft' },
+    { name: 'WhatsApp', url: `https://wa.me/${e164.replace(/^\+/, '')}`, note: 'Registered on WhatsApp? opens chat draft' },
     { name: 'Google dork', url: `https://www.google.com/search?q=${encodeURIComponent(orQuery)}`, note: 'All formats across the web' },
     { name: 'Bing dork', url: `https://www.bing.com/search?q=${encodeURIComponent(orQuery)}`, note: 'Second engine, different index' },
     { name: 'DuckDuckGo', url: `https://duckduckgo.com/?q=${encodeURIComponent(orQuery)}`, note: 'Privacy-friendly engine' },

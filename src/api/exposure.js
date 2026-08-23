@@ -433,10 +433,10 @@ async function exposureDomain(domain) {
     // Fallback: XposedOrNot breach catalog filtered by domain (free, CORS-open)
     try {
       const { status, data } = await fetchJson(`${XON_BREACHES_API}?domain=${encodeURIComponent(domain)}`, { timeout: 12000 })
-      const all = Array.isArray(data) ? data : []
+      const all = Array.isArray(data?.exposedBreaches) ? data.exposedBreaches : []
       const matches = all.filter((b) => {
-        const d = String(b.Domain || b.domain || '').toLowerCase()
-        return !d || d === domain || d.endsWith(`.${domain}`)
+        const d = String(b.domain || '').toLowerCase()
+        return d === domain || d.endsWith(`.${domain}`)
       })
       if (status === 404 || matches.length === 0) {
         findings.push({
@@ -448,9 +448,9 @@ async function exposureDomain(domain) {
         })
       } else {
         for (const b of matches.slice(0, 10)) {
-          const name = b.BreachID || b.Name || b.name || 'Unknown breach'
-          const classesArr = [].concat(b['Data Classes'] || b.DataClasses || [])
-          const date = b['Breach Date'] || b.BreachDate || b.breachDate || ''
+          const name = b.breachID || 'Unknown breach'
+          const classesArr = [].concat(b.exposedData || [])
+          const date = b.breachedDate || ''
           findings.push({
             kind: 'breach',
             value: name,

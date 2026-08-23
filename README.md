@@ -84,13 +84,13 @@ We clearly say which one it is:
 
 **How it works — everything below is key-free:**
 
-- **Email** — three providers in parallel, all free & CORS-open: `XposedOrNot` breach check + **breach analytics** (risk label, exposed data types, paste count), plus `Hudson Rock` **infostealer-log check** (was this mailbox on an infected computer?). HIBP fallback if you add a key in Settings.
+- **Email** — two providers, three checks/endpoints in parallel (all free & CORS-open): `XposedOrNot` breach check plus **breach analytics** (same provider, two endpoints) and `Hudson Rock` **infostealer-log check** (was this mailbox on an infected computer?). HIBP is a conditional fallback if you add a key in Settings, not a parallel provider.
 - **Username** — `Hudson Rock` stealer-log search (free, no key): does this handle appear on machines owned by infostealers? HIBP-style catalogs need a server proxy (their API blocks browsers by design) — we say so instead of faking it.
 - **Domain** — HIBP's public breach catalog filtered by domain (`Access-Control-Allow-Origin: *`, verified), with XposedOrNot's catalog as automatic fallback.
 - **Phone** — full **Phone Intel**, zero keys:
-  1. Offline parse via libphonenumber — validity, country, line type (mobile/VoIP/fixed), all formats
-  2. Live enrichment via phone-number-api.com — **carrier, region, timezone, disposable-number flag**
-  3. One-click pivot searches — Truecaller, Sync.me, WhatsApp probe, Google/Bing/DDG/Yandex dorks across every format variant, DeHashed leak search
+  1. Offline parse via libphonenumber — validity, country, line type (mobile/VoIP/fixed), all formats (fully local)
+  2. Live enrichment via phone-number-api.com — **carrier, region, timezone, disposable-number flag** — notice: this step sends the entered phone number off-device to a third-party API
+  3. User-initiated pivot searches to third-party services — Truecaller, Sync.me, WhatsApp probe, Google/Bing/DDG/Yandex dorks across every format variant, DeHashed leak search (each lookup is sent only when you click it)
   - No free API exposes phone-breach data from a browser — we give you the manual-check links instead of fake results.
 - **Image** — we compute `SHA-256` locally in your browser, show the hash, and link to check it yourself on VirusTotal. **Image never leaves your device.**
 - Respects CORS and provider limits. No shady proxies. No fake results.
