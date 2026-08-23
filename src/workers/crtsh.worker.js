@@ -2,6 +2,8 @@ const PROXIES = [
   (u) => u,
   (u) => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
   (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  (u) => `https://proxy.corsfix.com/?${encodeURIComponent(u)}`,
+  (u) => `https://yacdn.org/proxy/${u}`,
 ]
 
 self.onmessage = async (e) => {

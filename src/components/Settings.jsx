@@ -1,13 +1,22 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { getStoredKey, setStoredKey } from '../api/ai'
 
 export default function Settings({ onClose }) {
   const [key, setKey] = useState(getStoredKey())
+  useEffect(() => {
+    const h = (e) => e.key === 'Escape' && onClose()
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [onClose])
 
-  return (
+  return createPortal(
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h2>Settings</h2>
+      <div className="modal" role="dialog" aria-modal="true" aria-label="Settings" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h2>Settings</h2>
+          <button className="icon-close" onClick={onClose} aria-label="Close">×</button>
+        </div>
         <label className="field">
           <span>Anthropic API key (optional, enables AI features)</span>
           <input
@@ -44,6 +53,7 @@ export default function Settings({ onClose }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

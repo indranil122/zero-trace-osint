@@ -1,4 +1,5 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { useCaseFile } from '../store/casefile'
 import { collectEvents } from '../engine/timeline'
 
@@ -11,13 +12,18 @@ function fmt(ts) {
 export default function TimelineModal({ onClose }) {
   const nodes = useCaseFile((s) => s.nodes)
   const events = useMemo(() => collectEvents(nodes), [nodes])
+  useEffect(() => {
+    const h = (e) => e.key === 'Escape' && onClose()
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [onClose])
 
-  return (
+  return createPortal(
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal timeline" onClick={(e) => e.stopPropagation()}>
-        <div className="report-head">
+      <div className="modal timeline" role="dialog" aria-modal="true" aria-label="Timeline" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
           <h2>Timeline · {events.length} events</h2>
-          <button className="danger" onClick={onClose}>Close</button>
+          <button className="icon-close" onClick={onClose} aria-label="Close">×</button>
         </div>
 
         <div className="report-body">
@@ -45,6 +51,7 @@ export default function TimelineModal({ onClose }) {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

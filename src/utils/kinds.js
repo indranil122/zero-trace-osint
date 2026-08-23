@@ -1,6 +1,7 @@
 export const KINDS = {
   domain: { label: 'Domain', icon: '🌐', color: '#7dd3fc' },
   subdomain: { label: 'Subdomain', icon: '📡', color: '#a5b4fc' },
+  nameserver: { label: 'Nameserver', icon: '🛰️', color: '#93c5fd' },
   ip: { label: 'IP Address', icon: '🔌', color: '#fda4af' },
   email: { label: 'Email', icon: '✉️', color: '#86efac' },
   username: { label: 'Username', icon: '👤', color: '#fcd34d' },
@@ -36,4 +37,25 @@ export function normalizeValue(kind, raw) {
 
 export function nodeIdOf(kind, value) {
   return `${kind}:${normalizeValue(kind, value)}`
+}
+
+const EDGE_LABELS = {
+  'domain>ip': 'resolves-to',
+  'domain>subdomain': 'subdomain-of',
+  'domain>nameserver': 'delegates-to',
+  'domain>email': 'registrant-contact',
+  'subdomain>ip': 'resolves-to',
+  'subdomain>subdomain': 'subdomain-of',
+  'subdomain>nameserver': 'delegates-to',
+  'username>account': 'found-on',
+  'account>username': 'handle-of',
+  'email>domain': 'hosted-at',
+}
+
+export function edgeLabelFor(parentKind, childKind) {
+  return (
+    EDGE_LABELS[`${parentKind}>${childKind}`] ||
+    (childKind === 'email' ? 'mentions-email' : null) ||
+    'related-to'
+  )
 }

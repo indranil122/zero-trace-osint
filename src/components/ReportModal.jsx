@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { marked } from 'marked'
 import { useCaseFile } from '../store/casefile'
 import { buildReport, printHtml } from '../engine/report'
@@ -13,6 +14,12 @@ export default function ReportModal({ initialMode = 'analyst', onClose }) {
   const log = useCaseFile((s) => s.log)
   const aiNarrative = useCaseFile((s) => s.aiNarrative)
 
+  useEffect(() => {
+    const h = (e) => e.key === 'Escape' && onClose()
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [onClose])
+
   const markdown = useMemo(
     () => buildReport({ caseName, nodes, edges, log, aiNarrative }, mode),
     [caseName, nodes, edges, log, aiNarrative, mode]
@@ -25,8 +32,10 @@ export default function ReportModal({ initialMode = 'analyst', onClose }) {
     const a = document.createElement('a')
     a.href = url
     a.download = `${(caseName || 'case').replace(/[^a-z0-9_-]+/gi, '_')}${mode === 'ctf' ? '.writeup' : '.report'}.md`
+    document.body.appendChild(a)
     a.click()
-    URL.revokeObjectURL(url)
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
     useCaseFile.getState().pushLog('Report downloaded as Markdown', 'ok')
   }
 
@@ -67,11 +76,11 @@ export default function ReportModal({ initialMode = 'analyst', onClose }) {
     }
   }
 
-  return (
+  return createPortal(
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal report" onClick={(e) => e.stopPropagation()}>
+      <div className="modal report" role="dialog" aria-modal="true" aria-label="Investigation report" onClick={(e) => e.stopPropagation()}>
         <div className="report-head">
-          <div className="btn-row" style={{ margin: 0 }}>
+          <div className="seg">
             <button className={mode === 'analyst' ? 'tab active' : 'tab'} onClick={() => setMode('analyst')}>
               Analyst report
             </button>
@@ -79,7 +88,7 @@ export default function ReportModal({ initialMode = 'analyst', onClose }) {
               CTF writeup
             </button>
           </div>
-          <button className="danger" onClick={onClose}>Close</button>
+          <button className="icon-close" onClick={onClose} aria-label="Close">×</button>
         </div>
 
         <div className="report-body">
@@ -87,13 +96,14 @@ export default function ReportModal({ initialMode = 'analyst', onClose }) {
         </div>
 
         <div className="report-actions">
-          <button onClick={generateAiSummary} disabled={busy}>
+          <button className="btn-primary" onClick={generateAiSummary} disabled={busy}>
             {busy ? 'Thinking…' : aiNarrative ? 'Regenerate AI summary' : 'Generate AI summary'}
           </button>
           <button onClick={download}>Download .md</button>
           <button onClick={printPdf}>Print / Save PDF</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

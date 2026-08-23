@@ -71,20 +71,35 @@ async function fetchInline(url) {
     url,
     `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
     `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    `https://proxy.corsfix.com/?${encodeURIComponent(url)}`,
+    `https://yacdn.org/proxy/${url}`,
   ]
+  let lastErr = null
   for (const route of routes) {
+    const ctl = new AbortController()
+    const timer = setTimeout(() => ctl.abort(), 18000)
     try {
-      const ctl = new AbortController()
-      const timer = setTimeout(() => ctl.abort(), 20000)
       const r = await fetch(route, { headers: { accept: 'application/json' }, signal: ctl.signal })
-      clearTimeout(timer)
-      if (!r.ok) continue
-      return await r.json()
-    } catch {
+      if (!r.ok) {
+        lastErr = new Error(`HTTP ${r.status} from ${new URL(route).hostname}`)
+        continue
+      }
+      const text = await r.text()
+      if (!text || text.trim().startsWith('<')) throw new Error('Received HTML instead of JSON (blocked)')
+      return JSON.parse(text)
+    } catch (e) {
+      lastErr = e
+      if (e.name === 'AbortError') lastErr = new Error('Timed out — check connection')
       continue
+    } finally {
+      clearTimeout(timer)
     }
   }
-  throw new Error('crt.sh unreachable from the browser (all routes blocked or timed out)')
+  throw new Error(
+    lastErr?.message?.includes('Timed out')
+      ? 'crt.sh timed out — network slow or blocked. Try again, or use DNS/Wayback for subdomains.'
+      : `crt.sh unreachable (tried ${routes.length} routes). Last: ${lastErr?.message || 'blocked'}. Try again or use DNS/Wayback.`
+  )
 }
 
 export async function crtshScan(domain) {

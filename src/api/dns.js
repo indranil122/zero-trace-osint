@@ -3,18 +3,19 @@ const RESOLVERS = ['https://dns.google/resolve', 'https://cloudflare-dns.com/dns
 async function dohQuery(name, type) {
   let lastErr
   for (const base of RESOLVERS) {
+    const ctl = new AbortController()
+    const timer = setTimeout(() => ctl.abort(), 10000)
     try {
-      const ctl = new AbortController()
-      const timer = setTimeout(() => ctl.abort(), 10000)
       const r = await fetch(`${base}?name=${encodeURIComponent(name)}&type=${type}`, {
         headers: { accept: 'application/dns-json' },
         signal: ctl.signal,
       })
-      clearTimeout(timer)
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
       return await r.json()
     } catch (e) {
       lastErr = e
+    } finally {
+      clearTimeout(timer)
     }
   }
   throw lastErr || new Error('All resolvers failed')

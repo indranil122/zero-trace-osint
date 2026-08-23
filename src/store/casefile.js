@@ -1,8 +1,22 @@
 import { create } from 'zustand'
 import { applyNodeChanges, applyEdgeChanges, addEdge } from '@xyflow/react'
 import { saveCase, loadAllCases, deleteStoredCase } from './storage'
-import { normalizeValue, nodeIdOf } from '../utils/kinds'
+import { normalizeValue, nodeIdOf, edgeLabelFor } from '../utils/kinds'
 import { decryptFromVault } from '../utils/crypto'
+
+const HISTORY_LIMIT = 50
+
+function labeledEdge(sourceId, targetId, sourceKind, targetKind) {
+  return {
+    id: `e-${sourceId}-${targetId}`.replace(/[^a-z0-9-|]/gi, ''),
+    source: sourceId,
+    target: targetId,
+    label: edgeLabelFor(sourceKind, targetKind),
+    labelBgStyle: { fill: '#ffffff', fillOpacity: 0.9 },
+    labelStyle: { fill: '#6e6e73', fontSize: 10, fontWeight: 600 },
+    style: { stroke: '#c7c7cc' },
+  }
+}
 
 export const uid = () =>
   (crypto.randomUUID && crypto.randomUUID()) ||
@@ -72,6 +86,45 @@ export const useCaseFile = create((set, get) => ({
   tasks: [],
   selectedNodeId: null,
   lastSavedAt: null,
+  past: [],
+  future: [],
+
+  snapshot() {
+    const { nodes, edges, past } = get()
+    set({
+      past: [...past.slice(-HISTORY_LIMIT + 1), { nodes, edges }],
+      future: [],
+    })
+  },
+
+  undo() {
+    const { past, future, nodes, edges } = get()
+    if (!past.length) return
+    const prev = past[past.length - 1]
+    set({
+      nodes: prev.nodes,
+      edges: prev.edges,
+      past: past.slice(0, -1),
+      future: [...future, { nodes, edges }],
+    })
+    if (get().selectedNodeId && !get().nodes.some((n) => n.id === get().selectedNodeId)) {
+      set({ selectedNodeId: null })
+    }
+    get().scheduleSave()
+  },
+
+  redo() {
+    const { past, future, nodes, edges } = get()
+    if (!future.length) return
+    const next = future[future.length - 1]
+    set({
+      nodes: next.nodes,
+      edges: next.edges,
+      past: [...past, { nodes, edges }],
+      future: future.slice(0, -1),
+    })
+    get().scheduleSave()
+  },
 
   markSaved() {
     set({ lastSavedAt: new Date().toLocaleTimeString() })
@@ -157,6 +210,8 @@ export const useCaseFile = create((set, get) => ({
       log: Array.isArray(rec.log) ? rec.log : [],
       selectedNodeId: null,
       tasks: [],
+      past: [],
+      future: [],
       lastSavedAt: new Date(rec.updatedAt || Date.now()).toLocaleTimeString(),
     })
   },
@@ -218,6 +273,7 @@ export const useCaseFile = create((set, get) => ({
   },
 
   addNode(kind, position, extraData = {}) {
+    get().snapshot()
     const node = {
       id: uid(),
       type: 'entity',
@@ -230,6 +286,7 @@ export const useCaseFile = create((set, get) => ({
   },
 
   onNodesChange(changes) {
+    if (changes.some((c) => c.type === 'remove')) get().snapshot()
     set((s) => ({ nodes: applyNodeChanges(changes, s.nodes) }))
     if (changes.some((c) => c.type !== 'select' && c.type !== 'dimensions')) {
       get().scheduleSave()
@@ -241,13 +298,15 @@ export const useCaseFile = create((set, get) => ({
   },
 
   onEdgesChange(changes) {
+    if (changes.some((c) => c.type === 'remove')) get().snapshot()
     set((s) => ({ edges: applyEdgeChanges(changes, s.edges) }))
     if (changes.some((c) => c.type === 'remove')) get().scheduleSave()
   },
 
   onConnect(connection) {
+    get().snapshot()
     set((s) => ({
-      edges: addEdge({ ...connection, animated: false, style: { stroke: '#3b4a63' } }, s.edges),
+      edges: addEdge({ ...connection, animated: false, style: { stroke: '#c7c7cc' } }, s.edges),
     }))
     get().scheduleSave()
   },
@@ -272,8 +331,10 @@ export const useCaseFile = create((set, get) => ({
   },
 
   addFindings(parentId, findings) {
+    const s0 = get()
+    if (!s0.activeId || !Array.isArray(findings) || !findings.length) return
+    get().snapshot()
     set((state) => {
-      if (!state.activeId || !Array.isArray(findings) || !findings.length) return {}
       const nodes = [...state.nodes]
       const edges = [...state.edges]
       const byId = new Map(nodes.map((n) => [n.id, n]))
@@ -313,11 +374,8 @@ export const useCaseFile = create((set, get) => ({
           byId.set(nid, node)
         }
         if (parent && nid !== parent.id && !edgeKeys.has(`${parent.id}|${nid}`)) {
-          edges.push({
-            id: `e-${parent.id}-${nid}`.replace(/[^a-z0-9-|]/gi, ''),
-            source: parent.id,
-            target: nid,
-          })
+          const edge = labeledEdge(parent.id, nid, parent.data.kind, f.kind)
+          edges.push(edge)
           edgeKeys.add(`${parent.id}|${nid}`)
         }
       }
@@ -339,6 +397,7 @@ export const useCaseFile = create((set, get) => ({
   deleteSelected() {
     const { selectedNodeId: id } = get()
     if (!id) return
+    get().snapshot()
     set((s) => ({
       nodes: s.nodes.filter((n) => n.id !== id),
       edges: s.edges.filter((e) => e.source !== id && e.target !== id),
@@ -358,6 +417,7 @@ export const useCaseFile = create((set, get) => ({
     const a = s.nodes.find((n) => n.id === aId)
     const b = s.nodes.find((n) => n.id === bId)
     if (!a || !b) return
+    get().snapshot()
     const ev = { at: Date.now(), source, detail, url }
 
     set((state) => {
@@ -379,6 +439,9 @@ export const useCaseFile = create((set, get) => ({
             id: `x-${pairKeySafe(aId, bId)}`,
             source: aId,
             target: bId,
+            label: 'correlated',
+            labelBgStyle: { fill: '#ffffff', fillOpacity: 0.9 },
+            labelStyle: { fill: '#7c3aed', fontSize: 10, fontWeight: 600 },
             style: { stroke: '#8b5cf6' },
             animated: true,
             data: { correlation: true, reason: detail },
@@ -410,8 +473,10 @@ export const useCaseFile = create((set, get) => ({
     const a = document.createElement('a')
     a.href = url
     a.download = `${(s.caseName || 'case').replace(/[^a-z0-9_-]+/gi, '_')}.zerotrace.json`
+    document.body.appendChild(a)
     a.click()
-    URL.revokeObjectURL(url)
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
   },
 
   async importFromFile(file) {

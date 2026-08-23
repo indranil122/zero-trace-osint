@@ -14,6 +14,12 @@ const KIND_TITLES = {
   note: 'Notes',
 }
 
+function escMd(s) {
+  return String(s || '').replace(/[*_`[\\<]/g, '\\$&')
+}
+function escHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
+}
 function fmtTime(ts) {
   if (!ts) return ''
   return new Date(ts).toISOString().replace('T', ' ').slice(0, 16) + ' UTC'
@@ -41,7 +47,8 @@ export function buildReport({ caseName, nodes, edges, log, aiNarrative }, mode =
 
   const L = []
   const isCtf = mode === 'ctf'
-  const title = isCtf ? `CTF Writeup — ${caseName}` : `OSINT Intelligence Report — ${caseName}`
+  const safeName = escMd(caseName || 'Untitled')
+  const title = isCtf ? `CTF Writeup — ${safeName}` : `OSINT Intelligence Report — ${safeName}`
   L.push(`# ${title}`)
   L.push('')
   L.push(`_Generated ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC · Zero-Trace Workbench (local-only analysis)_`)
@@ -50,7 +57,7 @@ export function buildReport({ caseName, nodes, edges, log, aiNarrative }, mode =
   if (aiNarrative && aiNarrative.trim()) {
     L.push(isCtf ? '## Summary' : '## Executive Summary (AI-assisted)')
     L.push('')
-    L.push(aiNarrative.trim())
+    L.push(escMd(aiNarrative.trim()))
     L.push('')
   }
 
@@ -67,7 +74,7 @@ export function buildReport({ caseName, nodes, edges, log, aiNarrative }, mode =
   }
 
   const stats = [...byKind.entries()].filter(([, arr]) => arr.length)
-  const statLine = stats.map(([k, arr]) => `${arr.length} ${KIND_TITLES[k].toLowerCase()}`).join(', ')
+  const statLine = stats.map(([k, arr]) => `${arr.length} ${(KIND_TITLES[k] || k).toLowerCase()}`).join(', ')
   L.push(isCtf ? '## Intelligence Gathered' : '## Overview')
   L.push('')
   L.push(`This case contains ${nodes.length} entities (${statLine || 'none'}) connected by ${edges.length} relationships.`)
@@ -77,16 +84,16 @@ export function buildReport({ caseName, nodes, edges, log, aiNarrative }, mode =
   L.push('')
   for (const [kind, arr] of stats) {
     if (!arr.length || kind === 'note') continue
-    L.push(`### ${KIND_TITLES[kind]} (${arr.length})`)
+    L.push(`### ${(KIND_TITLES[kind] || kind)} (${arr.length})`)
     L.push('')
     for (const n of arr) {
-      L.push(`- **${n.data.label}**`)
+      L.push(`- **${escMd(n.data.label)}**`)
       for (const ev of (n.data.evidence || []).slice(0, 12)) {
-        const bits = [`source: ${ev.source}`]
-        if (ev.detail) bits.push(ev.detail)
+        const bits = [`source: ${escMd(ev.source)}`]
+        if (ev.detail) bits.push(escMd(ev.detail))
         if (ev.at) bits.push(`at ${fmtTime(ev.at)}`)
         L.push(`  - ${bits.join(' · ')}`)
-        if (ev.url) L.push(`    - <${ev.url}>`)
+        if (ev.url) L.push(`    - <${escMd(ev.url)}>`)
       }
     }
     L.push('')
@@ -97,7 +104,7 @@ export function buildReport({ caseName, nodes, edges, log, aiNarrative }, mode =
     L.push('## Correlated Relationships')
     L.push('')
     for (const c of corr) {
-      L.push(`- **${c.a.data.label}** ⇄ **${c.b.data.label}** — ${c.reason}`)
+      L.push(`- **${escMd(c.a.data.label)}** ⇄ **${escMd(c.b.data.label)}** — ${escMd(c.reason)}`)
     }
     L.push('')
   }
@@ -107,7 +114,7 @@ export function buildReport({ caseName, nodes, edges, log, aiNarrative }, mode =
     L.push('## Analyst Notes')
     L.push('')
     for (const n of notes) {
-      L.push(`- ${n.data.label}${n.data.notes ? ` — ${n.data.notes}` : ''}`)
+      L.push(`- ${escMd(n.data.label)}${n.data.notes ? ` — ${escMd(n.data.notes)}` : ''}`)
     }
     L.push('')
   }
@@ -119,7 +126,7 @@ export function buildReport({ caseName, nodes, edges, log, aiNarrative }, mode =
 }
 
 export function printHtml(bodyHtml, title) {
-  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${escHtml(title)}</title>
 <style>
   body{font-family:Georgia,'Times New Roman',serif;max-width:760px;margin:40px auto;padding:0 24px;color:#1a2233;line-height:1.55;font-size:14px}
   h1{font-size:26px;border-bottom:2px solid #1a2233;padding-bottom:8px}

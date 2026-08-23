@@ -1,6 +1,7 @@
 export function parseCdx(rows, domain) {
   const hosts = new Set()
   let snapshots = 0
+  const d = String(domain || '').toLowerCase()
   if (!Array.isArray(rows)) return { hosts: [], snapshots: 0 }
   const start = Array.isArray(rows[0]) && String(rows[0][0]).includes('original') ? 1 : 0
   for (let i = start; i < rows.length; i++) {
@@ -9,8 +10,10 @@ export function parseCdx(rows, domain) {
     try {
       const u = new URL(String(row[0]))
       let host = u.hostname.toLowerCase().replace(/^www\./, '')
-      if (host === domain || host.endsWith(`.${domain}`)) hosts.add(host)
-      snapshots++
+      if (host === d || host.endsWith(`.${d}`)) {
+        hosts.add(host)
+        snapshots++
+      }
     } catch {
       continue
     }

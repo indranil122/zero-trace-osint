@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { findCorrelations } from '../src/engine/correlate.js'
 import { buildReport } from '../src/engine/report.js'
 import { encryptToVault, decryptFromVault } from '../src/utils/crypto.js'
-import { normalizeValue, nodeIdOf } from '../src/utils/kinds.js'
+import { normalizeValue, nodeIdOf, edgeLabelFor } from '../src/utils/kinds.js'
 import { md5 } from '../src/utils/md5.js'
 import { parseCdx } from '../src/api/wayback.js'
 import { nextMoves } from '../src/engine/nextmoves.js'
@@ -152,7 +152,7 @@ check('parses hosts, strips header row and www', () => {
   ]
   const { hosts, snapshots } = parseCdx(rows, 'example.com')
   assert.deepEqual(hosts.sort(), ['api.example.com', 'example.com'])
-  assert.equal(snapshots, 3)
+  assert.equal(snapshots, 2)
 })
 check('handles headerless arrays and junk', () => {
   assert.deepEqual(parseCdx(null, 'x.com'), { hosts: [], snapshots: 0 })
@@ -206,7 +206,28 @@ check('milestones parsed from evidence details', () => {
   assert.deepEqual([...times].sort((a, b) => b - a), times)
 })
 
-console.log('\n[8] encrypted vault roundtrip')
+console.log('\n[8] edge relationship labels')
+check('domain to ip resolves-to', () => {
+  assert.equal(edgeLabelFor('domain', 'ip'), 'resolves-to')
+  assert.equal(edgeLabelFor('subdomain', 'ip'), 'resolves-to')
+})
+check('domain to subdomain subdomain-of', () => {
+  assert.equal(edgeLabelFor('domain', 'subdomain'), 'subdomain-of')
+})
+check('domain delegates nameservers and contacts', () => {
+  assert.equal(edgeLabelFor('domain', 'nameserver'), 'delegates-to')
+  assert.equal(edgeLabelFor('domain', 'email'), 'registrant-contact')
+})
+check('username hub found-on account', () => {
+  assert.equal(edgeLabelFor('username', 'account'), 'found-on')
+})
+check('fallback labels are never empty', () => {
+  assert.equal(edgeLabelFor('email', 'domain'), 'hosted-at')
+  assert.equal(edgeLabelFor('note', 'email'), 'mentions-email')
+  assert.equal(edgeLabelFor('note', 'phone'), 'related-to')
+})
+
+console.log('\n[9] encrypted vault roundtrip')
 ;(async () => {
   const secret = { format: 'zero-trace-case', caseName: 'classified', nodes: [{ id: 'n1' }] }
   const vault = await encryptToVault(secret, 'correct horse battery')

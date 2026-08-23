@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useState } from 'react'
 import {
   ReactFlow,
   Background,
@@ -10,12 +11,14 @@ import '@xyflow/react/dist/style.css'
 import { useCaseFile } from '../../store/casefile'
 import { useRunner } from '../../engine/useRunner'
 import EntityNode from './EntityNode'
+import CanvasToolbar from './CanvasToolbar'
+import NodeContextMenu from './NodeContextMenu'
 
 const nodeTypes = { entity: EntityNode }
 const proOptions = { hideAttribution: true }
 
 function nodeColor(node) {
-  return node?.data?.kind ? undefined : '#64748b'
+  return node?.data?.kind ? undefined : '#a1a1a6'
 }
 
 export default function FlowCanvas() {
@@ -26,8 +29,29 @@ export default function FlowCanvas() {
   const onConnect = useCaseFile((s) => s.onConnect)
   const select = useCaseFile((s) => s.select)
   const addNode = useCaseFile((s) => s.addNode)
+  const undo = useCaseFile((s) => s.undo)
+  const redo = useCaseFile((s) => s.redo)
   const { runImageExif } = useRunner()
   const screenToFlowPosition = useReactFlow().screenToFlowPosition
+  const [menu, setMenu] = useState(null)
+
+  const closeMenu = useCallback(() => setMenu(null), [])
+
+  useEffect(() => {
+    const onKey = (e) => {
+      const tag = e.target?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
+        e.preventDefault()
+        undo()
+      } else if (((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z') || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y')) {
+        e.preventDefault()
+        redo()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [undo, redo])
 
   function handleImageDrop(file, position) {
     if (!file || !file.type.startsWith('image/')) {
@@ -41,7 +65,7 @@ export default function FlowCanvas() {
   return (
     <div className="canvas-wrap">
       <ReactFlow
-        colorMode="dark"
+        colorMode="light"
         nodeTypes={nodeTypes}
         nodes={nodes}
         edges={edges}
@@ -50,7 +74,13 @@ export default function FlowCanvas() {
         onConnect={onConnect}
         onNodeDragStop={useCaseFile.getState().onNodeDragStop}
         onNodeClick={(_, n) => select(n.id)}
-        onPaneClick={() => select(null)}
+        onPaneClick={() => { select(null); closeMenu() }}
+        onNodeContextMenu={(e, n) => {
+          e.preventDefault()
+          select(n.id)
+          setMenu({ x: e.clientX, y: e.clientY, nodeId: n.id })
+        }}
+        onMoveStart={closeMenu}
         onDragOver={(e) => {
           e.preventDefault()
           e.dataTransfer.dropEffect = 'copy'
@@ -66,16 +96,20 @@ export default function FlowCanvas() {
         minZoom={0.15}
         maxZoom={2}
         proOptions={proOptions}
-        defaultEdgeOptions={{ style: { stroke: '#3b4a63' } }}
+        defaultEdgeOptions={{ style: { stroke: '#c7c7cc' } }}
       >
-        <Background variant={BackgroundVariant.Dots} gap={26} size={1.4} color="#223049" />
+        <Background variant={BackgroundVariant.Dots} gap={26} size={1.3} color="#d2d2d7" />
         <Controls showInteractive={false} />
-        <MiniMap pannable zoomable maskColor="#0b112099" nodeColor={nodeColor} />
+        <MiniMap pannable zoomable maskColor="rgba(255,255,255,0.78)" nodeColor={nodeColor} />
       </ReactFlow>
 
+      <CanvasToolbar />
+
       <div className="canvas-hint">
-        Drag from a node&apos;s bottom handle to another node to link them · Select a node to inspect it
+        Drag between handles to link · Right-click a node for actions · Ctrl+K to search · Ctrl+Z to undo
       </div>
+
+      {menu && <NodeContextMenu x={menu.x} y={menu.y} nodeId={menu.nodeId} onClose={closeMenu} />}
     </div>
   )
 }

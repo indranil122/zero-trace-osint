@@ -4,6 +4,7 @@ import { useCaseFile } from './store/casefile'
 import FlowCanvas from './components/canvas/FlowCanvas'
 import Sidebar from './components/Sidebar'
 import Inspector from './components/Inspector'
+import Terminal from './components/Terminal'
 import Home from './components/Home'
 
 function Workspace() {
@@ -13,16 +14,16 @@ function Workspace() {
     <div className="app">
       <Sidebar />
       <main className="main">
-        {isEmpty && (
-          <div className="empty-state">
-            <h2>Start an investigation</h2>
-            <p>
-              Add entities from the left panel — a domain, an email, a username — then
-              link them by dragging between nodes. Recon modules will fill this canvas for you.
-            </p>
-          </div>
-        )}
-        <FlowCanvas />
+        <div className="canvas-area">
+          {isEmpty && (
+            <div className="empty-state">
+              <h2>Start an investigation</h2>
+              <p>Add a domain above → run DNS/WHOIS/Certs. Everything appears as nodes you can pivot from.</p>
+            </div>
+          )}
+          <FlowCanvas />
+        </div>
+        <Terminal />
       </main>
       <Inspector />
     </div>

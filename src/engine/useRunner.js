@@ -67,6 +67,12 @@ export function useRunner() {
 
   const runDomainModule = useCallback(
     (moduleKey, rawInput) => {
+      const typed = String(rawInput || '').trim()
+      if (typed) {
+        const id = ensureDomainTarget(typed)
+        if (!id) return Promise.resolve(false)
+        return runModule(moduleKey, id, id.slice('domain:'.length))
+      }
       const store = useCaseFile.getState()
       const selected = store.selectedNodeId
         ? store.nodes.find((n) => n.id === store.selectedNodeId)

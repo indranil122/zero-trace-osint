@@ -60,6 +60,12 @@ Audit date: 2026-08-22. Each issue is pinned to its location in the codebase, ra
 ## Still open (accepted limitations, see ROADMAP.md)
 - Username hunt covers 5 CORS-open platforms (Sherlock-class coverage needs a proxy worker)
 - HIBP breach lookup absent (requires paid key; BYO-key design sketched in roadmap)
-- Edges carry no relationship labels; no undo; no graph search
-- PDF export relies on the browser print dialog rather than generating a file
+- True PDF generation still uses the browser print dialog (v1.1 shipped PNG graph export instead; jsPDF deliberately not added to keep the bundle lean)
 - No component/E2E tests; only engine-level self-tests
+
+## v1.1 resolutions
+- ✅ Undo/redo: 50-step structural history (`store/casefile.js`), Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y + canvas toolbar
+- ✅ Graph search: Ctrl+K quick-jump palette (`components/canvas/QuickSearch.jsx`)
+- ✅ Edge relationship labels: `edgeLabelFor()` (`utils/kinds.js`), applied at edge creation in `addFindings` / `linkNodes`
+- ✅ Node context menu: right-click pivots / copy / delete (`components/canvas/NodeContextMenu.jsx`)
+- ✅ PNG graph export: toolbar button (`components/canvas/CanvasToolbar.jsx`, html-to-image)

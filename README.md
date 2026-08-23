@@ -1,113 +1,173 @@
-# zero-trace-osint
+# Zero-Trace OSINT Workbench
 
-Browser-only OSINT recon workbench. All recon queries execute directly from the client against public data sources; investigation state persists in browser IndexedDB. There is no backend, no account system, and no server-side logging component.
+> **Investigate anything — right in your browser. No server, no account, no logs.**
 
-## Architecture
+[![Vite](https://img.shields.io/badge/Vite-646CFF?logo=vite&logoColor=white)](https://vitejs.dev)
+[![React 19](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev)
+[![Tailwind + shadcn](https://img.shields.io/badge/UI-Tailwind_shadcn-black)](https://ui.shadcn.com)
+[![License MIT](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+[![No Backend](https://img.shields.io/badge/Privacy-100%25_Browser_Only-black)](#)
+[![PWA Ready](https://img.shields.io/badge/PWA-Installable-blue)](public/manifest.webmanifest)
 
-Single-page React application. Static build output only — any static file host can serve it.
+**Live demo:** `npm run dev` → http://localhost:5173 — works fully offline after first load.
 
-```
-src/
-├── api/            Outbound data-source adapters (one file per source)
-│   ├── ai.js           Anthropic messages API, direct browser call
-│   ├── crtsh.js        Certificate transparency search (Web Worker + proxy fallback)
-│   ├── dns.js          DNS-over-HTTPS (Google primary, Cloudflare fallback)
-│   ├── exif.js         Local EXIF parsing via exifr
-│   ├── gravatar.js     Avatar existence probe (MD5 hash)
-│   ├── rdap.js         Registration data via RDAP protocol
-│   ├── username.js     Profile probes against CORS-open platform APIs
-│   └── wayback.js      Wayback Machine CDX + availability APIs
-├── engine/         Pure logic, unit-tested, no DOM dependencies
-│   ├── correlate.js    Deterministic entity-linking rules
-│   ├── nextmoves.js    Pivot suggestion rules
-│   ├── report.js       Markdown report builder + print pipeline
-│   ├── timeline.js     Evidence chronology extraction
-│   └── useRunner.js    Module registry + task/log orchestration hook
-├── store/
-│   ├── casefile.js     Zustand store: multi-case state machine
-│   └── storage.js      IndexedDB access layer
-├── workers/
-│   └── crtsh.worker.js Off-main-thread fetch/parse for large CT responses
-├── components/     UI layer (canvas, panels, modals)
-└── utils/          kinds.js (entity taxonomy), crypto.js (vaults), md5.js
-scripts/
-└── selftest.mjs    Engine test suite (runs in Node, no browser required)
-docs/
-├── GAP-ANALYSIS.md Issue audit with resolution status
-└── ROADMAP.md      Planned work by version
-```
+---
 
-State management is a single Zustand store. Each case is one IndexedDB record containing nodes, edges, evidence chains, activity log, and an optional AI narrative. Node identity is deterministic (`kind:value`) so repeated scans deduplicate instead of duplicating entities.
+### What is this?
 
-## Recon modules
+Zero-Trace is a free tool to investigate domains, usernames, emails and images. You type a name, it talks directly to public sources and draws everything as a clean graph you can click and explore.
 
-| Module | Source | Transport | Notes |
-|---|---|---|---|
-| DNS | dns.google, cloudflare-dns.com | DoH JSON API, CORS-open | A, AAAA, CNAME, MX, NS, TXT, SOA |
-| WHOIS | rdap.org bootstrap | RDAP over HTTPS | Registrar, events, status, contacts, nameservers |
-| Certificates | crt.sh | Direct, then CORS proxies | Runs inside a Web Worker; 150-subdomain cap |
-| Archive | web.archive.org | CDX + availability API, CORS-open | Subdomain discovery from archived URLs |
-| Username hunt | GitHub, GitLab, Reddit, npm, Keybase | Platform JSON APIs | Existence probing only where CORS permits |
-| Image EXIF | local file | None (in-browser) | Camera, timestamps, exposure, GPS coordinates |
-| Gravatar | gravatar.com | Image probe with d=404 | Avatar existence per email address |
+Most OSINT tools send your search to *their* server. This one does not. Your search goes straight from your browser to the public source. Nothing is saved on any server — only on your own computer.
 
-Every finding written to the graph carries an evidence record: source identifier, detail string, timestamp, and source URL. Reports render these chains verbatim.
+**In one sentence:** *Type a domain → see DNS, WHOIS, certificates, archives, and links — as dots and lines you can pivot from.*
 
-## Correlation
+---
 
-Two-stage design:
+### Who is it for?
 
-1. Deterministic rules (`engine/correlate.js`): email-domain to domain-node matching, username-to-account handle equality, shared IP addresses, shared nameservers. Each suggestion carries high/medium confidence.
-2. Optional LLM pass (`api/ai.js`, Claude Haiku): fuzzy same-entity inference over the entity list. Requires a user-supplied Anthropic API key stored in localStorage; requests go browser-to-Anthropic using the `anthropic-dangerous-direct-browser-access` header.
+- **CTF players** — fast recon + one-click report for writeups
+- **Students** — learn how real investigations work, visually
+- **Researchers** — keep your own trace private while you investigate
 
-Accepted suggestions become graph edges flagged `data.correlation` with the reasoning attached to both endpoints' evidence chains.
+---
 
-## Persistence and encryption
+### Why it is different
 
-- Active case auto-saves (350 ms debounce) to IndexedDB database `zerotrace-workbench`, object store `cases`.
-- Multiple cases supported; last-active pointer kept in `localStorage['zt-last-active']`.
-- Plain export: `.zerotrace.json`.
-- Encrypted export: `.ztvault.json` — AES-256-GCM, PBKDF2-SHA256 key derivation at 250,000 iterations, random 16-byte salt and 12-byte IV per vault (WebCrypto, `utils/crypto.js`). No password recovery exists.
-- Imports always create a new case record; they never overwrite existing state.
+1. **Truly private.** No backend, no database, no logs. All data lives in your browser (IndexedDB). Close the tab, reopen — your case is still there, locally.
+2. **You see the graph, not a table.** Every finding becomes a node. A domain connects to its IPs, subdomains, emails. Drag to link, right-click to run the next check.
+3. **Every finding keeps its proof.** Each dot remembers *where* it came from, *when*, and a link to the source. Reports include this evidence.
+4. **Smart first, AI second.** Simple rules link things instantly for free (same email on two accounts = linked). AI is only used when you ask it to.
 
-## Getting started
+---
 
-Requirements: Node 18+ (developed on Node 24), npm.
+### What you can do
+
+| You do | What happens | Example |
+|---|---|---|
+| **Type a domain → DNS** | Shows A, MX, TXT, NS… records | `supermynd.in` → IPs, mail servers |
+| **WHOIS / RDAP** | Who owns it, when it was made, registrar | Shows `ns1.dns-parking.com` |
+| **Certificates** | Finds hidden subdomains from SSL logs | `api.example.com` appears |
+| **Wayback** | Finds old pages and subdomains | Archived URLs |
+| **Username hunt** | Checks 5 platforms where CORS allows | GitHub, GitLab, Reddit, npm, Keybase |
+| **Email** | Finds contacts + Gravatar check | Is `jdoe@example.com` real/active? |
+| **Image drop** | Reads camera, date, GPS — never uploads | EXIF stays on your device |
+| **Correlate** | Links overlap (same IP, same handle) | High/Medium confidence + reason |
+| **AI** | Optional Claude pass for fuzzy matches | Needs your own Anthropic key |
+
+Every edge on the graph has a label: `resolves-to`, `subdomain-of`, `delegates-to`, `correlated`.
+
+---
+
+### The canvas — how it feels
+
+- **Graph canvas** — infinite, smooth (Lenis) at your screen’s refresh rate. Drag from a dot’s handle to link.
+- **Search** — `Ctrl+K` to jump to any dot.
+- **Right-click** — run DNS/WHOIS/Certs on that dot.
+- **Undo / Redo** — `Ctrl+Z` / `Ctrl+Shift+Z` (50 steps).
+- **Export image** — one click PNG of the whole graph.
+- **Terminal at bottom** — always shows logs + “next steps” suggestions. No hidden panels.
+
+Sidebar is now clean: 3 tabs — **Investigate / Build / Intel** — so nothing scrolls. All actions fit on screen.
+
+Design: **Apple-like black-on-white** with shadcn/ui, Tailwind. Looks calm, reads easy.
+
+---
+
+### Reports — one click
+
+- **Analyst report** — executive summary, overview, entities + evidence, correlations, notes.
+- **CTF writeup** — methodology + findings, ready to submit.
+- Download as **.md**, or **Print / Save as PDF** from your browser.
+
+If you add an Anthropic key (Settings → saved only in `localStorage`), you can generate an AI summary.
+
+---
+
+### Your data stays yours
+
+- Auto-save every 350ms to `IndexedDB` (`zerotrace-workbench`).
+- Many cases supported. Last open case remembered.
+- Export plain: `.zerotrace.json`
+- Export locked: `.ztvault.json` — **AES-256-GCM**, PBKDF2 250,000 rounds, random salt & IV (Web Crypto). No password recovery.
+- Import always creates a **new** case — never overwrites.
+
+PWA: install to desktop. Works offline to view saved cases.
+
+---
+
+### Try it in 30 seconds
+
+Need **Node 18+** (built on Node 24).
 
 ```bash
 npm install
-npm run dev       # dev server on :5173
-npm run test      # engine self-tests (Node, no browser)
-npm run lint      # oxlint
-npm run build     # production bundle -> dist/
-npm run preview   # serve dist/ locally
+npm run dev      # http://localhost:5173
 ```
 
-## Deployment
+Other commands:
 
-`dist/` is fully static. Repository includes configs for both:
+```bash
+npm run test     # 27 checks, no browser needed
+npm run lint     # oxlint
+npm run build    # → dist/  (fully static)
+npm run preview  # serve dist/ locally
+```
 
-- Netlify: `netlify.toml` (build command, publish dir, SPA redirect)
-- Vercel: `vercel.json`
+---
 
-Vite `base` is set to `'./'` so the build also works from subpath hosting such as GitHub Pages.
+### Deploy anywhere — no server needed
 
-## PWA
+`dist/` is just static files. Works on:
 
-Production builds register a service worker (`public/sw.js`): network-first navigation with offline fallback, stale-while-revalidate for same-origin assets. The app installs to desktop/home-screen via `public/manifest.webmanifest`.
+- **Netlify** — `netlify.toml` included
+- **Vercel** — `vercel.json` included
+- **GitHub Pages** — `base: './'` already set
 
-## Testing
+Just drag `dist/` or `npm run build` on the host.
 
-`scripts/selftest.mjs` exercises the pure engines without a browser: input normalization, correlation rules, report builders, MD5 vectors (RFC 1321 plus UTF-8 multibyte), CDX response parsing, pivot-suggestion rules, timeline extraction, and vault encrypt/decrypt round-trip including wrong-password rejection.
+---
 
-## Known limitations
+### How it is built (simple)
 
-Documented in `docs/GAP-ANALYSIS.md`; forward plan in `docs/ROADMAP.md`. Summary: username enumeration covers five platforms (CORS-constrained), breach-data lookup is not integrated, canvas lacks undo/search, PDF output relies on the browser print pipeline.
+```
+src/
+  api/        talks to public sources (dns, rdap, crtsh, wayback, username, exif, gravatar, ai)
+  engine/     plain logic: linking rules, next-step suggestions, timeline, reports
+  store/      one Zustand store + IndexedDB (cases live here)
+  workers/    crt.sh parsing off the main thread
+  components/ UI — sidebar, canvas, inspector, terminal, modals
+  utils/      kinds (what is a domain/email…), crypto (vault), md5
+```
 
-## Legal
+A node is `kind:value` (like `domain:example.com`) so the same thing never duplicates.
 
-For authorized security research, CTF use, and education. Users are responsible for compliance with applicable law and the terms of service of every queried data source.
+---
 
-## License
+### Honest limits
 
-MIT — see [LICENSE](LICENSE).
+- Username check = **5 platforms** (browser CORS limit; more needs a tiny proxy — planned)
+- No breach-data lookup yet (HIBP needs a paid key — BYO design is ready)
+- PDF is via your browser’s Print dialog (lightweight, no extra 350KB)
+- If `crt.sh` is blocked, we try 5 routes + show a clear message — try **DNS** or **Wayback** for subdomains instead
+
+Details: `docs/GAP-ANALYSIS.md` → `docs/ROADMAP.md`.
+
+---
+
+### Is it legal?
+
+For **authorized research, CTFs, and learning only**. You must follow the law and each source’s terms. Don’t scan what you don’t have permission to investigate.
+
+---
+
+### Tags / Keywords
+
+`osint` `recon` `osint-tool` `ctf` `security` `investigation` `graph` `browser-only` `privacy` `no-backend` `pwa` `react` `vite` `tailwindcss` `shadcn-ui` `lenis` `indexeddb` `certificate-transparency` `whois` `dns` `wayback-machine` `exif`
+
+Add these as **GitHub Topics** (Repo → Settings → Topics) to help people find it.
+
+---
+
+### License
+
+**MIT** — see [LICENSE](LICENSE). Free to use, copy, and learn from.
