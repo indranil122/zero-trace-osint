@@ -11,7 +11,8 @@ async function dohQuery(name, type) {
         signal: ctl.signal,
       })
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
-      return await r.json()
+      const json = await r.json()
+      return { json, resolver: base.includes('google') ? 'dns.google' : 'cloudflare-dns.com' }
     } catch (e) {
       lastErr = e
     } finally {
@@ -24,29 +25,59 @@ async function dohQuery(name, type) {
 export async function dnsScan(domain) {
   const types = ['A', 'AAAA', 'CNAME', 'MX', 'NS', 'TXT', 'SOA']
   const findings = []
+  const now = Date.now()
+  const normalizedDomain = String(domain || '').trim().toLowerCase()
 
   for (const type of types) {
     try {
-      const j = await dohQuery(domain, type)
-      const answers = (j.Answer || []).map((a) => String(a.data))
-      if (!answers.length) continue
-      const link = `https://dns.google/query?name=${encodeURIComponent(domain)}&type=${type}`
+      const { json: j, resolver } = await dohQuery(normalizedDomain, type)
+      const rawAnswers = j.Answer || []
+      if (!rawAnswers.length) continue
+      const link = `https://dns.google/query?name=${encodeURIComponent(normalizedDomain)}&type=${type}`
+      const ttl = rawAnswers[0]?.TTL ?? j.TTL ?? null
+      const answers = rawAnswers.map((a) => String(a.data))
+
       if (type === 'A' || type === 'AAAA') {
-        for (const ip of answers) {
+        for (const ans of rawAnswers) {
+          const ip = String(ans.data).trim()
+          if (!ip) continue
           findings.push({
             kind: 'ip',
             value: ip,
             source: 'DNS-over-HTTPS',
-            detail: `${type} record resolving ${domain}`,
+            detail: `${type} ${ip} ← ${normalizedDomain} (TTL ${ans.TTL ?? ttl ?? '—'}s via ${resolver})`,
             url: link,
+            meta: {
+              recordType: type,
+              ttl: ans.TTL ?? ttl ?? null,
+              resolver,
+              query: normalizedDomain,
+              raw: ans.data,
+              normalized: ip,
+              timestamp: now,
+              sourceUrl: link,
+            },
           })
         }
       }
+
+      // Detailed aggregate evidence for Inspector — includes TTL, resolver, raw
       findings.push({
         kind: '@',
         source: 'DNS-over-HTTPS',
-        detail: `${type} ×${answers.length}: ${answers.slice(0, 5).join(', ')}${answers.length > 5 ? ' …' : ''}`,
+        detail: `${type} ×${answers.length} — TTL ${ttl ?? '—'}s via ${resolver} @ ${new Date(now).toISOString().slice(0, 19)}Z`,
         url: link,
+        meta: {
+          recordType: type,
+          ttl,
+          resolver,
+          query: normalizedDomain,
+          raw: answers,
+          normalized: answers,
+          count: answers.length,
+          timestamp: now,
+          sourceUrl: link,
+        },
       })
     } catch {
       continue

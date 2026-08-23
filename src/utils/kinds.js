@@ -6,6 +6,8 @@ export const KINDS = {
   email: { label: 'Email', icon: '✉️', color: '#86efac' },
   username: { label: 'Username', icon: '👤', color: '#fcd34d' },
   account: { label: 'Account', icon: '🔗', color: '#fb923c' },
+  breach: { label: 'Breach', icon: '🔓', color: '#f43f5e' },
+  name: { label: 'Name', icon: '🧑', color: '#a3e635' },
   location: { label: 'Location', icon: '📍', color: '#e879f9' },
   phone: { label: 'Phone', icon: '📞', color: '#d8b4fe' },
   image: { label: 'Image / EXIF', icon: '🖼️', color: '#5eead4' },
@@ -31,6 +33,12 @@ export function normalizeValue(kind, raw) {
     v = v.toLowerCase()
   } else if (kind === 'username' || kind === 'account') {
     v = v.replace(/^@+/, '').toLowerCase()
+  } else if (kind === 'breach') {
+    v = v.trim()
+  } else if (kind === 'name') {
+    v = v.trim()
+  } else if (kind === 'phone') {
+    v = v.replace(/[\s\-()]/g, '').trim()
   }
   return v.replace(/^\*\./, '').replace(/\.$/, '')
 }
@@ -41,15 +49,23 @@ export function nodeIdOf(kind, value) {
 
 const EDGE_LABELS = {
   'domain>ip': 'resolves-to',
-  'domain>subdomain': 'subdomain-of',
+  'domain>subdomain': 'has-subdomain',
   'domain>nameserver': 'delegates-to',
   'domain>email': 'registrant-contact',
+  'domain>breach': 'exposed-in',
   'subdomain>ip': 'resolves-to',
-  'subdomain>subdomain': 'subdomain-of',
+  'subdomain>subdomain': 'has-subdomain',
   'subdomain>nameserver': 'delegates-to',
   'username>account': 'found-on',
+  'username>breach': 'exposed-in',
   'account>username': 'handle-of',
   'email>domain': 'hosted-at',
+  'email>breach': 'exposed-in',
+  'phone>breach': 'exposed-in',
+  'image>breach': 'exposed-in',
+  'name>breach': 'exposed-in',
+  'breach>email': 'affects',
+  'breach>domain': 'affects',
 }
 
 export function edgeLabelFor(parentKind, childKind) {

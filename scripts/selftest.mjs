@@ -2,7 +2,8 @@ import assert from 'node:assert/strict'
 import { findCorrelations } from '../src/engine/correlate.js'
 import { buildReport } from '../src/engine/report.js'
 import { encryptToVault, decryptFromVault } from '../src/utils/crypto.js'
-import { normalizeValue, nodeIdOf, edgeLabelFor } from '../src/utils/kinds.js'
+import { normalizeValue, nodeIdOf, edgeLabelFor, KINDS } from '../src/utils/kinds.js'
+import { exposureScan } from '../src/api/exposure.js'
 import { md5 } from '../src/utils/md5.js'
 import { parseCdx } from '../src/api/wayback.js'
 import { nextMoves } from '../src/engine/nextmoves.js'
@@ -177,6 +178,7 @@ console.log('\n[6] next-moves rules')
       ev('DNS-over-HTTPS', 'A ×1'),
       ev('Certificate transparency · crt.sh', '5 unique hostname(s)'),
       ev('Wayback Machine', 'archived URL(s)'),
+      ev('Exposure · XposedOrNot', 'No known breaches'),
     ])
     const moves = nextMoves([scanned]).filter((m) => m.nodeId === scanned.id)
     assert.equal(moves.length, 0)
@@ -211,8 +213,9 @@ check('domain to ip resolves-to', () => {
   assert.equal(edgeLabelFor('domain', 'ip'), 'resolves-to')
   assert.equal(edgeLabelFor('subdomain', 'ip'), 'resolves-to')
 })
-check('domain to subdomain subdomain-of', () => {
-  assert.equal(edgeLabelFor('domain', 'subdomain'), 'subdomain-of')
+check('domain to subdomain has-subdomain', () => {
+  assert.equal(edgeLabelFor('domain', 'subdomain'), 'has-subdomain')
+  assert.equal(edgeLabelFor('subdomain', 'subdomain'), 'has-subdomain')
 })
 check('domain delegates nameservers and contacts', () => {
   assert.equal(edgeLabelFor('domain', 'nameserver'), 'delegates-to')
@@ -226,8 +229,30 @@ check('fallback labels are never empty', () => {
   assert.equal(edgeLabelFor('note', 'email'), 'mentions-email')
   assert.equal(edgeLabelFor('note', 'phone'), 'related-to')
 })
+check('exposure edge labels', () => {
+  assert.equal(edgeLabelFor('email', 'breach'), 'exposed-in')
+  assert.equal(edgeLabelFor('domain', 'breach'), 'exposed-in')
+  assert.equal(edgeLabelFor('phone', 'breach'), 'exposed-in')
+  assert.equal(edgeLabelFor('image', 'breach'), 'exposed-in')
+})
 
-console.log('\n[9] encrypted vault roundtrip')
+console.log('\n[9] DNS detailed & new kinds')
+check('phone and name normalization', () => {
+  assert.equal(normalizeValue('phone', '(123) 456-7890'), '1234567890')
+  assert.equal(normalizeValue('name', '  John Doe  '), 'John Doe')
+  assert.equal(normalizeValue('breach', '  Have I Been Pwned  '), 'Have I Been Pwned')
+})
+check('new kinds exist', () => {
+  assert.ok(KINDS.breach)
+  assert.ok(KINDS.name)
+  assert.equal(KINDS.breach.label, 'Breach')
+})
+check('DNS grouping does not duplicate via nodeId', () => {
+  assert.equal(nodeIdOf('ip', '1.1.1.1'), nodeIdOf('ip', '1.1.1.1 '))
+  assert.equal(nodeIdOf('breach', 'Test Breach'), 'breach:Test Breach')
+})
+
+console.log('\n[10] encrypted vault roundtrip')
 ;(async () => {
   const secret = { format: 'zero-trace-case', caseName: 'classified', nodes: [{ id: 'n1' }] }
   const vault = await encryptToVault(secret, 'correct horse battery')
@@ -249,6 +274,17 @@ console.log('\n[9] encrypted vault roundtrip')
   }
   check('wrong password is rejected', () => {
     assert.ok(rejected)
+  })
+
+  // Exposure module — browser-first, no network for phone
+  const phoneFindings = await exposureScan({ kind: 'phone', value: '+1 (555) 123-4567' })
+  check('phone exposure returns provider_unavailable without leaking', () => {
+    assert.ok(phoneFindings.some((f) => f.meta?.status === 'provider_unavailable'))
+    assert.ok(!phoneFindings.some((f) => f.detail.toLowerCase().includes('password:')))
+  })
+  const domainFindings = await exposureScan({ kind: 'phone', value: 'not-a-phone' })
+  check('exposure handles any phone string gracefully', () => {
+    assert.ok(Array.isArray(domainFindings) && domainFindings.length > 0)
   })
 
   console.log(`\n${passed} checks passed${process.exitCode ? ' (with failures above)' : ''}`)

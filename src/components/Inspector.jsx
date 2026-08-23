@@ -22,6 +22,7 @@ export default function Inspector() {
   const { runModule, runImageExif } = useRunner()
   const fileRef = useRef(null)
   const [dragOver, setDragOver] = useState(false)
+  const [showAllDns, setShowAllDns] = useState(false)
 
   function analyzeFile(file) {
     if (!file) return
@@ -150,18 +151,94 @@ export default function Inspector() {
         {!node.data.evidence?.length && (
           <p className="dim">No evidence yet. Recon modules will attach their source + timestamp here.</p>
         )}
-        {[...(node.data.evidence || [])].reverse().map((ev, i) => (
-          <div key={i} className="ev-item">
-            <div className="ev-top">
-              <strong>{ev.source}</strong>
-              <time>{timeAgo(ev.at)}</time>
-            </div>
-            {ev.detail && <p>{ev.detail}</p>}
-            {ev.url && (
-              <a href={ev.url} target="_blank" rel="noreferrer">open source ↗</a>
-            )}
-          </div>
-        ))}
+        {(() => {
+          const evidences = [...(node.data.evidence || [])].reverse()
+          const isDnsEvidence = (ev) => ev.recordType || ev.source === 'DNS-over-HTTPS'
+          const isExposure = (ev) => ev.source && ev.source.includes('Exposure')
+          const dnsEvs = evidences.filter(isDnsEvidence)
+          const expEvs = evidences.filter(isExposure)
+          const otherEvs = evidences.filter((ev) => !isDnsEvidence(ev) && !isExposure(ev))
+          const visibleDns = showAllDns ? dnsEvs : dnsEvs.slice(0, 3)
+          const hasMoreDns = dnsEvs.length > 3
+
+          return (
+            <>
+              {expEvs.map((ev, i) => {
+                const status = ev.status || ev.meta?.status || 'unknown'
+                const sev = ev.severity || ev.meta?.severity || ''
+                const conf = ev.confidence || ev.meta?.confidence || ''
+                const bName = ev.breachName || ev.meta?.breachName || ''
+                const bDate = ev.breachDate || ev.meta?.breachDate || ''
+                const dClasses = ev.dataClasses || ev.meta?.dataClasses || ''
+                const statusColor = status === 'confirmed' ? '#ef4444' : status === 'possible' ? '#f59e0b' : status === 'no_result' ? '#10b981' : '#6b7280'
+                return (
+                  <div key={`exp-${i}`} className="ev-item" style={{ borderLeftColor: statusColor }}>
+                    <div className="ev-top">
+                      <strong>{ev.source}</strong>
+                      <time>{timeAgo(ev.at)}</time>
+                    </div>
+                    {ev.detail && <p>{ev.detail}</p>}
+                    <div className="dns-meta" style={{ marginTop: 6 }}>
+                      <span className="dns-tag" style={{ background: statusColor, color: '#fff', border: 'none' }}>{status.replace('_', ' ')}</span>
+                      {sev && <span className="dns-tag">Severity: {sev}</span>}
+                      {conf && <span className="dns-tag">Confidence: {conf}</span>}
+                      {bName && <span className="dns-tag">Breach: {bName}</span>}
+                    </div>
+                    {bDate && <p className="dim" style={{ fontSize: '11px' }}>Incident: {String(bDate).slice(0, 10)}</p>}
+                    {dClasses && <p className="dim" style={{ fontSize: '11px', wordBreak: 'break-word' }}>Exposed data: {String(dClasses).slice(0, 120)}</p>}
+                    {ev.hash && <p className="dim" style={{ fontSize: '11px', wordBreak: 'break-all' }}>Hash: {ev.hash.slice(0, 24)}…</p>}
+                    {ev.url && <a href={ev.url} target="_blank" rel="noreferrer">verify source ↗</a>}
+                    <p className="dim" style={{ fontSize: '11px', marginTop: 4, fontStyle: 'italic' }}>Never shows passwords/tokens. Verify at original breach source.</p>
+                  </div>
+                )
+              })}
+              {visibleDns.map((ev, i) => (
+                <div key={`dns-${i}`} className="ev-item dns-ev">
+                  <div className="ev-top">
+                    <strong>{ev.source}{ev.recordType ? ` · ${ev.recordType}` : ''}</strong>
+                    <time>{timeAgo(ev.at)}</time>
+                  </div>
+                  {ev.detail && <p>{ev.detail}</p>}
+                  <div className="dns-meta">
+                    {ev.recordType && <span className="dns-tag">Type: {ev.recordType}</span>}
+                    {ev.resolver && <span className="dns-tag">Resolver: {ev.resolver}</span>}
+                    {ev.ttl != null && <span className="dns-tag">TTL: {ev.ttl}s</span>}
+                    {ev.query && <span className="dns-tag">Query: {ev.query}</span>}
+                  </div>
+                  {ev.timestamp && <p className="dim" style={{ fontSize: '11px' }}>Captured: {new Date(ev.timestamp).toISOString().replace('T', ' ').slice(0, 19)}Z</p>}
+                  {ev.raw != null && Array.isArray(ev.raw) ? (
+                    <details className="dns-raw">
+                      <summary>Raw ({ev.raw.length} records)</summary>
+                      <code>{ev.raw.slice(0, 10).join(', ')}{ev.raw.length > 10 ? '…' : ''}</code>
+                    </details>
+                  ) : ev.raw != null && typeof ev.raw === 'string' ? (
+                    <p className="dim" style={{ fontSize: '11px', wordBreak: 'break-all' }}>Raw: {ev.raw} {ev.normalized && ev.normalized !== ev.raw ? `→ ${ev.normalized}` : ''}</p>
+                  ) : null}
+                  {ev.url && <a href={ev.url} target="_blank" rel="noreferrer">open source ↗</a>}
+                  <p className="dim" style={{ fontSize: '11px', marginTop: 4, fontStyle: 'italic' }}>Discovered via {ev.resolver || 'DNS-over-HTTPS'} for query “{ev.query || node.data.label}” — explains where and why this record was found.</p>
+                </div>
+              ))}
+              {hasMoreDns && (
+                <button className="wide" style={{ marginBottom: 8 }} onClick={() => setShowAllDns(!showAllDns)}>
+                  {showAllDns ? 'Show less' : `Show all ${dnsEvs.length} DNS records (+${dnsEvs.length - 3})`}
+                </button>
+              )}
+              {otherEvs.map((ev, i) => (
+                <div key={`other-${i}`} className="ev-item">
+                  <div className="ev-top">
+                    <strong>{ev.source}</strong>
+                    <time>{timeAgo(ev.at)}</time>
+                  </div>
+                  {ev.detail && <p>{ev.detail}</p>}
+                  {ev.url && <a href={ev.url} target="_blank" rel="noreferrer">open source ↗</a>}
+                </div>
+              ))}
+              {hasMoreDns && dnsEvs.length > 6 && !showAllDns && (
+                <p className="dim" style={{ textAlign: 'center' }}>A/AAAA results grouped and deduplicated. Expand to see all {dnsEvs.length} records. Graph positions IPs in a tight cluster below the domain for clarity.</p>
+              )}
+            </>
+          )
+        })()}
       </section>
     </aside>
   )

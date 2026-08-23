@@ -2,9 +2,13 @@ import * as React from 'react'
 import { cn } from '@/lib/utils'
 
 const Tabs = ({ defaultValue, value, onValueChange, children, className }) => {
-  const [active, setActive] = React.useState(value ?? defaultValue)
-  React.useEffect(() => { if (value !== undefined) setActive(value) }, [value])
-  const ctx = { active, setActive: (v) => { if (value === undefined) setActive(v); onValueChange?.(v) } }
+  const [internalActive, setInternalActive] = React.useState(value ?? defaultValue)
+  const active = value !== undefined ? value : internalActive
+  const setActive = (v) => {
+    if (value === undefined) setInternalActive(v)
+    onValueChange?.(v)
+  }
+  const ctx = { active, setActive }
   return <div className={cn('', className)} data-tabs>{React.Children.map(children, (c) => React.isValidElement(c) ? React.cloneElement(c, { _ctx: ctx }) : c)}</div>
 }
 

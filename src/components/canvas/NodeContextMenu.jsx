@@ -26,8 +26,8 @@ export default function NodeContextMenu({ x, y, nodeId, onClose }) {
   if (!node) return null
   const meta = kindMeta(node.data.kind)
 
-  function act(fn) {
-    fn()
+  async function act(fn) {
+    try { await fn() } catch {}
     onClose()
   }
 
@@ -53,9 +53,28 @@ export default function NodeContextMenu({ x, y, nodeId, onClose }) {
       <button
         className="ctx-item"
         onClick={() =>
-          act(() => {
-            navigator.clipboard?.writeText(node.data.label || '')
-            useCaseFile.getState().pushLog('Value copied to clipboard')
+          act(async () => {
+            const text = node.data.label || ''
+            try {
+              if (!navigator.clipboard?.writeText) throw new Error('Clipboard API unavailable')
+              await navigator.clipboard.writeText(text)
+              useCaseFile.getState().pushLog('Value copied to clipboard', 'ok')
+            } catch (e) {
+              try {
+                const ta = document.createElement('textarea')
+                ta.value = text
+                ta.style.position = 'fixed'
+                ta.style.opacity = '0'
+                document.body.appendChild(ta)
+                ta.select()
+                const ok = document.execCommand('copy')
+                ta.remove()
+                if (ok) useCaseFile.getState().pushLog('Value copied to clipboard', 'ok')
+                else throw e
+              } catch {
+                useCaseFile.getState().pushLog(`Copy failed — ${e.message}`, 'err')
+              }
+            }
           })
         }
       >

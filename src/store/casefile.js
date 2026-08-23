@@ -8,7 +8,7 @@ const HISTORY_LIMIT = 50
 
 function labeledEdge(sourceId, targetId, sourceKind, targetKind) {
   return {
-    id: `e-${sourceId}-${targetId}`.replace(/[^a-z0-9-|]/gi, ''),
+    id: `e-${encodeURIComponent(sourceId)}--${encodeURIComponent(targetId)}`,
     source: sourceId,
     target: targetId,
     label: edgeLabelFor(sourceKind, targetKind),
@@ -341,9 +341,28 @@ export const useCaseFile = create((set, get) => ({
       const edgeKeys = new Set(edges.map((e) => `${e.source}|${e.target}`))
       let parent = parentId ? byId.get(parentId) : undefined
 
+      let dnsIpIndex = 0
       for (const f of findings) {
         if (!f || typeof f !== 'object') continue
-        const ev = { at: Date.now(), source: f.source || 'unknown', detail: f.detail || '', url: f.url }
+        const ev = {
+          at: Date.now(),
+          source: f.source || 'unknown',
+          detail: f.detail || '',
+          url: f.url,
+          ...(f.meta
+            ? {
+                recordType: f.meta.recordType,
+                ttl: f.meta.ttl,
+                resolver: f.meta.resolver,
+                query: f.meta.query,
+                raw: f.meta.raw,
+                normalized: f.meta.normalized,
+                timestamp: f.meta.timestamp,
+                sourceUrl: f.meta.sourceUrl,
+                count: f.meta.count,
+              }
+            : {}),
+        }
 
         if (f.kind === '@') {
           if (!parent) continue
@@ -364,10 +383,18 @@ export const useCaseFile = create((set, get) => ({
             evidence: [...(d.evidence || []), ev],
           }))
         } else {
+          const isDnsIp = parent && f.meta?.recordType && ['A', 'AAAA'].includes(f.meta.recordType) && f.kind === 'ip'
+          const position = isDnsIp
+            ? {
+                x: parent.position.x + ((dnsIpIndex % 3) - 1) * 140,
+                y: parent.position.y + 160 + Math.floor(dnsIpIndex / 3) * 90,
+              }
+            : placeAround(byId.size, parent)
+          if (isDnsIp) dnsIpIndex++
           const node = {
             id: nid,
             type: 'entity',
-            position: placeAround(byId.size, parent),
+            position,
             data: { kind: f.kind, label: value, notes: '', evidence: [ev] },
           }
           nodes.push(node)

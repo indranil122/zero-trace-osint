@@ -4,6 +4,7 @@ const EVIDENCE_MARKERS = {
   certs: 'Certificate transparency',
   wayback: 'Wayback Machine',
   gravatar: 'Gravatar',
+  exposure: 'Exposure',
 }
 
 function hasEvidence(node, marker) {
@@ -71,6 +72,18 @@ export function nextMoves(nodes) {
           value: handle,
           title: `Create username hub "${handle}"`,
           reason: 'Found via account probe — pivot point for cross-platform hunts',
+        })
+      }
+    }
+
+    if (['email', 'phone', 'username', 'domain', 'name', 'image'].includes(kind)) {
+      if (!hasEvidence(n, EVIDENCE_MARKERS.exposure)) {
+        push({
+          key: `exposure:${n.id}`,
+          nodeId: n.id,
+          module: 'exposure',
+          title: `Exposure check for ${label.slice(0, 24)}`,
+          reason: kind === 'email' ? 'Check if this address appears in public breach data (private, no passwords shown)' : kind === 'phone' ? 'Phone exposure requires HIBP key — will explain provider limits' : kind === 'image' ? 'Hash image locally and check exposure (no upload)' : `Check if this ${kind} has known public exposure`,
         })
       }
     }

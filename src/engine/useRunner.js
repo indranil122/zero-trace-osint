@@ -6,12 +6,14 @@ import { crtshScan } from '../api/crtsh'
 import { usernameScan } from '../api/username'
 import { exifScan } from '../api/exif'
 import { waybackScan } from '../api/wayback'
+import { exposureScan } from '../api/exposure'
 
 export const MODULES = {
   dns: { label: 'DNS records', accepts: ['domain', 'subdomain'], scan: (t) => dnsScan(t) },
   rdap: { label: 'WHOIS · RDAP', accepts: ['domain'], scan: (t) => rdapScan(t) },
   certs: { label: 'Certificates', accepts: ['domain', 'subdomain'], scan: (t) => crtshScan(t) },
   wayback: { label: 'Wayback Machine', accepts: ['domain', 'subdomain'], scan: (t) => waybackScan(t) },
+  exposure: { label: 'Exposure check', accepts: ['email', 'phone', 'username', 'domain', 'name', 'image'], scan: (t, meta) => exposureScan({ kind: meta?.kind || 'email', value: t, file: meta?.file }) },
 }
 
 const DOMAINISH = new Set(['domain', 'subdomain'])
@@ -36,9 +38,20 @@ export function useRunner() {
       const tid = addTask(mod.label)
       pushLog(`${mod.label}: scanning ${targetLabel}…`)
       try {
-        const findings = await mod.scan(targetLabel)
+        const findings =
+          moduleKey === 'exposure'
+            ? await exposureScan({ kind, value: targetLabel, file: parent?.data?.file })
+            : await mod.scan(targetLabel)
         useCaseFile.getState().addFindings(parentNodeId, findings)
-        pushLog(`${mod.label}: done — ${findings.filter((f) => f.kind !== '@').length} linked finding(s)`, 'ok')
+        const linked = findings.filter((f) => f.kind !== '@').length
+        const meta = findings.find((f) => f.meta?.status)
+        if (meta) {
+          const status = meta.meta.status
+          const label = status === 'confirmed' ? 'exposure confirmed' : status === 'possible' ? 'possible match' : status === 'no_result' ? 'no exposure found' : 'provider unavailable'
+          pushLog(`${mod.label}: ${label} — ${meta.detail.slice(0, 80)}`, status === 'confirmed' ? 'warn' : status === 'provider_unavailable' ? 'warn' : 'ok')
+        } else {
+          pushLog(`${mod.label}: done — ${linked} linked finding(s)`, 'ok')
+        }
         return true
       } catch (e) {
         pushLog(`${mod.label} failed — ${e.message}`, 'err')
@@ -52,15 +65,15 @@ export function useRunner() {
 
   const ensureDomainTarget = useCallback(
     (rawInput) => {
-      const value = String(rawInput || '').trim()
-      if (!value) {
+      const normalized = normalizeValue('domain', String(rawInput || '').trim())
+      if (!normalized) {
         useCaseFile.getState().pushLog('Type a domain first (e.g. example.com)', 'warn')
         return null
       }
       useCaseFile.getState().addFindings(null, [
-        { kind: 'domain', value, source: 'Operator input', detail: 'Investigation target' },
+        { kind: 'domain', value: normalized, source: 'Operator input', detail: 'Investigation target' },
       ])
-      return `domain:${value.toLowerCase()}`
+      return `domain:${normalized}`
     },
     []
   )
@@ -69,9 +82,14 @@ export function useRunner() {
     (moduleKey, rawInput) => {
       const typed = String(rawInput || '').trim()
       if (typed) {
-        const id = ensureDomainTarget(typed)
-        if (!id) return Promise.resolve(false)
-        return runModule(moduleKey, id, id.slice('domain:'.length))
+        const normalized = normalizeValue('domain', typed)
+        if (!normalized) {
+          useCaseFile.getState().pushLog('Type a domain first (e.g. example.com)', 'warn')
+          return Promise.resolve(false)
+        }
+        const id = `domain:${normalized}`
+        useCaseFile.getState().addFindings(null, [{ kind: 'domain', value: normalized, source: 'Operator input', detail: 'Investigation target' }])
+        return runModule(moduleKey, id, normalized)
       }
       const store = useCaseFile.getState()
       const selected = store.selectedNodeId

@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { useReactFlow } from '@xyflow/react'
 import { useCaseFile } from '../store/casefile'
-import { KINDS, normalizeValue } from '../utils/kinds'
+import { KINDS, normalizeValue, nodeIdOf } from '../utils/kinds'
 import { encryptToVault } from '../utils/crypto'
 import { useRunner } from '../engine/useRunner'
 import { Button } from '@/components/ui/button'
@@ -30,10 +30,12 @@ export default function Sidebar() {
 
   const [domainInput, setDomainInput] = useState('')
   const [handleInput, setHandleInput] = useState('')
+  const [exposureKind, setExposureKind] = useState('email')
+  const [exposureValue, setExposureValue] = useState('')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [reportMode, setReportMode] = useState(null)
   const [timelineOpen, setTimelineOpen] = useState(false)
-  const { runDomainModule, runUsernameHunt } = useRunner()
+  const { runDomainModule, runUsernameHunt, runModule } = useRunner()
 
   const selected = selectedNodeId ? nodes.find((n) => n.id === selectedNodeId) : null
   const pivotTarget = selected && ['domain', 'subdomain'].includes(selected.data.kind) && selected.data.label ? selected.data.label : null
@@ -44,6 +46,15 @@ export default function Sidebar() {
     const radius = 110 + (count % 5) * 48
     const center = screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 })
     return { x: center.x + Math.cos(angle) * radius, y: center.y + Math.sin(angle) * radius }
+  }
+
+  function handleExposure() {
+    const v = exposureValue.trim()
+    if (!v) { useCaseFile.getState().pushLog('Enter a value to check exposure', 'warn'); return }
+    const kind = exposureKind
+    useCaseFile.getState().addFindings(null, [{ kind, value: v, source: 'Operator input', detail: 'Exposure check target — personal data, verify manually' }])
+    const nodeId = nodeIdOf(kind, v)
+    runModule('exposure', nodeId, v)
   }
 
   async function exportVault() {
@@ -126,6 +137,25 @@ export default function Sidebar() {
                   </div>
                 </div>
                 <p className="text-[11px] leading-relaxed text-muted-foreground">Tip: type new domain to branch, or leave empty to pivot on selected node.</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 space-y-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Exposure — check your own data</p>
+                <p className="text-[11px] leading-relaxed text-muted-foreground">Check email, phone, username, domain, name, or image hash for public breach exposure. No passwords ever shown.</p>
+                <div className="flex gap-1.5">
+                  <select value={exposureKind} onChange={(e) => setExposureKind(e.target.value)} className="h-8 rounded-md border border-input bg-background px-2 text-xs">
+                    <option value="email">Email</option>
+                    <option value="phone">Phone</option>
+                    <option value="username">Username</option>
+                    <option value="domain">Domain</option>
+                    <option value="name">Name</option>
+                    <option value="image">Image hash</option>
+                  </select>
+                  <Input value={exposureValue} placeholder={exposureKind === 'email' ? 'you@example.com' : exposureKind === 'phone' ? '+1…' : exposureKind === 'domain' ? 'example.com' : 'value'} onChange={(e) => setExposureValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleExposure()} className="h-8 flex-1" />
+                </div>
+                <Button size="sm" className="w-full h-7 bg-black text-white hover:bg-black/90 text-xs" onClick={handleExposure}>Check exposure →</Button>
+                <p className="text-[10px] leading-relaxed text-muted-foreground">Statuses: confirmed / possible / no result / provider unavailable. Image hash is local — never uploaded. Add HIBP key in ⚙ for username/phone/domain.</p>
               </CardContent>
             </Card>
           </TabsContent>

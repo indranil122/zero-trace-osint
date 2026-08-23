@@ -1,4 +1,4 @@
-const KIND_ORDER = ['domain', 'subdomain', 'nameserver', 'ip', 'email', 'username', 'account', 'location', 'image', 'phone', 'note']
+const KIND_ORDER = ['domain', 'subdomain', 'nameserver', 'ip', 'email', 'username', 'account', 'breach', 'name', 'location', 'image', 'phone', 'note']
 
 const KIND_TITLES = {
   domain: 'Domains',
@@ -8,6 +8,8 @@ const KIND_TITLES = {
   email: 'Emails',
   username: 'Usernames',
   account: 'Accounts',
+  breach: 'Breaches',
+  name: 'Names',
   location: 'Locations',
   image: 'Images',
   phone: 'Phones',
@@ -15,7 +17,18 @@ const KIND_TITLES = {
 }
 
 function escMd(s) {
-  return String(s || '').replace(/[*_`[\\<]/g, '\\$&')
+  return String(s || '')
+    .split('\n')
+    .map((line) =>
+      line
+        .replace(/^(\s*)(#{1,6})(\s)/, (_, a, b, c) => `${a}\\${b[0]}${b.slice(1)}${c}`)
+        .replace(/^(\s*)>/, '$1\\>')
+        .replace(/^(\s*)([-*+])(\s)/, '$1\\$2$3')
+        .replace(/^(\s*)(\d+)(\.)(\s)/, '$1$2\\$3$4')
+        .replace(/^(\s*)([-*_])(\s*\2){2,}\s*$/, (m) => `\\${m.trim()[0]}${m.trim().slice(1)}`)
+    )
+    .join('\n')
+    .replace(/[*_`[\\<]/g, '\\$&')
 }
 function escHtml(s) {
   return String(s || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
@@ -96,6 +109,49 @@ export function buildReport({ caseName, nodes, edges, log, aiNarrative }, mode =
         if (ev.url) L.push(`    - <${escMd(ev.url)}>`)
       }
     }
+    L.push('')
+  }
+
+  // Exposure Intelligence — Discover → Correlate → Verify → Exposure → Report
+  const exposureNodes = byKind.get('breach') || []
+  const exposureEvs = nodes.flatMap((n) => (n.data.evidence || []).filter((ev) => ev.source && ev.source.includes('Exposure')))
+  if (exposureNodes.length || exposureEvs.length) {
+    L.push('## Exposure Intelligence')
+    L.push('')
+    if (exposureNodes.length) {
+      L.push(`Confirmed breach references: ${exposureNodes.map((n) => escMd(n.data.label)).join(', ')}`)
+      L.push('')
+    }
+    const byStatus = {}
+    for (const ev of exposureEvs) {
+      const s = ev.status || (ev.meta && ev.meta.status) || 'unknown'
+      byStatus[s] = (byStatus[s] || 0) + 1
+    }
+    if (Object.keys(byStatus).length) {
+      L.push(`Exposure summary: ${Object.entries(byStatus).map(([k, v]) => `${v} ${k.replace(/_/g, ' ')}`).join(', ')}`)
+      L.push('')
+    }
+    for (const n of nodes) {
+      for (const ev of (n.data.evidence || []).filter((ev) => ev.source && ev.source.includes('Exposure'))) {
+        const status = ev.status || (ev.meta && ev.meta.status) || 'unknown'
+        const sev = ev.severity || (ev.meta && ev.meta.severity) || ''
+        const conf = ev.confidence || (ev.meta && ev.meta.confidence) || ''
+        const bName = ev.breachName || (ev.meta && ev.meta.breachName) || ''
+        const bDate = ev.breachDate || (ev.meta && ev.meta.breachDate) || ''
+        const dClasses = ev.dataClasses || (ev.meta && ev.meta.dataClasses) || ''
+        let line = `- **${escMd(n.data.label)}** (${n.data.kind}) — **${escMd(status)}** — ${escMd(ev.detail)}`
+        if (bName) line += ` — breach: ${escMd(bName)}`
+        if (bDate) line += ` @ ${escMd(String(bDate).slice(0, 10))}`
+        if (dClasses) line += ` — data: ${escMd(String(dClasses).slice(0, 80))}`
+        if (conf) line += ` — confidence: ${escMd(conf)}`
+        if (sev) line += ` — severity: ${escMd(sev)}`
+        line += ` — source: ${escMd(ev.source)}`
+        L.push(line)
+        if (ev.url) L.push(`  - <${escMd(ev.url)}>`)
+      }
+    }
+    L.push('')
+    L.push('_Never displays passwords/tokens/cookies. Statuses: confirmed exposure, possible match, no result, provider unavailable. Verify via original breach source._')
     L.push('')
   }
 

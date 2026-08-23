@@ -14,9 +14,9 @@ DialogOverlay.displayName = 'DialogOverlay'
 
 const DialogContent = React.forwardRef(({ className, children, onOpenChange, ...props }, ref) => (
   <div className="fixed inset-0 z-50 grid place-items-center p-4">
-    <div ref={ref} className={cn('relative bg-background rounded-xl shadow-xl border max-h-[90vh] overflow-auto w-full', className)} {...props}>
+    <div ref={ref} role="dialog" aria-modal="true" className={cn('relative bg-background rounded-xl shadow-xl border max-h-[90vh] overflow-auto w-full', className)} {...props}>
       {children}
-      <button onClick={() => onOpenChange?.(false)} className="absolute right-3 top-3 rounded-md p-1.5 hover:bg-accent"><X className="h-4 w-4" /></button>
+      <button aria-label="Close" onClick={() => onOpenChange?.(false)} className="absolute right-3 top-3 rounded-md p-1.5 hover:bg-accent"><X className="h-4 w-4" /></button>
     </div>
   </div>
 ))
