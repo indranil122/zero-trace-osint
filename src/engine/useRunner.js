@@ -13,8 +13,10 @@ export const MODULES = {
   rdap: { label: 'WHOIS · RDAP', accepts: ['domain'], scan: (t) => rdapScan(t) },
   certs: { label: 'Certificates', accepts: ['domain', 'subdomain'], scan: (t) => crtshScan(t) },
   wayback: { label: 'Wayback Machine', accepts: ['domain', 'subdomain'], scan: (t) => waybackScan(t) },
-  exposure: { label: 'Exposure check', accepts: ['email', 'phone', 'username', 'domain', 'name', 'image'], scan: (t, meta) => exposureScan({ kind: meta?.kind || 'email', value: t, file: meta?.file }) },
+  exposure: { label: 'Exposure check', accepts: ['email', 'phone', 'username', 'domain', 'name', 'image'], scan: (t) => exposureScan({ kind: 'email', value: t }) },
 }
+
+const imageFileByNode = new Map()
 
 const DOMAINISH = new Set(['domain', 'subdomain'])
 
@@ -40,7 +42,7 @@ export function useRunner() {
       try {
         const findings =
           moduleKey === 'exposure'
-            ? await exposureScan({ kind, value: targetLabel, file: parent?.data?.file })
+            ? await exposureScan({ kind, value: targetLabel, file: kind === 'image' ? (imageFileByNode.get(parentNodeId) || parent?.data?.file) : undefined })
             : await mod.scan(targetLabel)
         useCaseFile.getState().addFindings(parentNodeId, findings)
         const linked = findings.filter((f) => f.kind !== '@').length
@@ -141,6 +143,7 @@ export function useRunner() {
   const runImageExif = useCallback(
     async (nodeId, file) => {
       if (!nodeId || !file) return
+      imageFileByNode.set(nodeId, file)
       const tid = addTask('EXIF extraction')
       pushLog(`EXIF: reading ${file.name} (${Math.round(file.size / 1024)} KB) — locally, nothing uploads…`)
       try {

@@ -17,7 +17,8 @@ const KIND_TITLES = {
 }
 
 function escMd(s) {
-  return String(s || '')
+  const inline = String(s || '').replace(/[*_`[\\<]/g, '\\$&')
+  return inline
     .split('\n')
     .map((line) =>
       line
@@ -28,7 +29,6 @@ function escMd(s) {
         .replace(/^(\s*)([-*_])(\s*\2){2,}\s*$/, (m) => `\\${m.trim()[0]}${m.trim().slice(1)}`)
     )
     .join('\n')
-    .replace(/[*_`[\\<]/g, '\\$&')
 }
 function escHtml(s) {
   return String(s || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])

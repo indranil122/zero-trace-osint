@@ -33,6 +33,8 @@ export default function Inspector() {
     if (!node.data.label || node.data.label.endsWith('…')) {
       updateSelected({ label: file.name })
     }
+    // Store file reference for exposure hash (local, not persisted to IDB as blob for now — keep name for reload)
+    try { updateSelected({ fileName: file.name, fileSize: file.size }) } catch {}
     runImageExif(node.id, file)
   }
 
@@ -153,7 +155,7 @@ export default function Inspector() {
         )}
         {(() => {
           const evidences = [...(node.data.evidence || [])].reverse()
-          const isDnsEvidence = (ev) => ev.recordType || ev.source === 'DNS-over-HTTPS'
+          const isDnsEvidence = (ev) => (ev.recordType || ev.meta?.recordType) || ev.source === 'DNS-over-HTTPS'
           const isExposure = (ev) => ev.source && ev.source.includes('Exposure')
           const dnsEvs = evidences.filter(isDnsEvidence)
           const expEvs = evidences.filter(isExposure)
@@ -170,6 +172,7 @@ export default function Inspector() {
                 const bName = ev.breachName || ev.meta?.breachName || ''
                 const bDate = ev.breachDate || ev.meta?.breachDate || ''
                 const dClasses = ev.dataClasses || ev.meta?.dataClasses || ''
+                const hash = ev.hash || ev.meta?.hash || ''
                 const statusColor = status === 'confirmed' ? '#ef4444' : status === 'possible' ? '#f59e0b' : status === 'no_result' ? '#10b981' : '#6b7280'
                 return (
                   <div key={`exp-${i}`} className="ev-item" style={{ borderLeftColor: statusColor }}>
@@ -186,38 +189,47 @@ export default function Inspector() {
                     </div>
                     {bDate && <p className="dim" style={{ fontSize: '11px' }}>Incident: {String(bDate).slice(0, 10)}</p>}
                     {dClasses && <p className="dim" style={{ fontSize: '11px', wordBreak: 'break-word' }}>Exposed data: {String(dClasses).slice(0, 120)}</p>}
-                    {ev.hash && <p className="dim" style={{ fontSize: '11px', wordBreak: 'break-all' }}>Hash: {ev.hash.slice(0, 24)}…</p>}
+                    {hash && <p className="dim" style={{ fontSize: '11px', wordBreak: 'break-all' }}>Hash: {String(hash).slice(0, 24)}…</p>}
                     {ev.url && <a href={ev.url} target="_blank" rel="noreferrer">verify source ↗</a>}
                     <p className="dim" style={{ fontSize: '11px', marginTop: 4, fontStyle: 'italic' }}>Never shows passwords/tokens. Verify at original breach source.</p>
                   </div>
                 )
               })}
-              {visibleDns.map((ev, i) => (
+              {visibleDns.map((ev, i) => {
+                const rt = ev.recordType || ev.meta?.recordType
+                const res = ev.resolver || ev.meta?.resolver
+                const ttl = ev.ttl ?? ev.meta?.ttl
+                const q = ev.query || ev.meta?.query
+                const ts = ev.timestamp || ev.meta?.timestamp
+                const raw = ev.raw ?? ev.meta?.raw
+                const norm = ev.normalized ?? ev.meta?.normalized
+                return (
                 <div key={`dns-${i}`} className="ev-item dns-ev">
                   <div className="ev-top">
-                    <strong>{ev.source}{ev.recordType ? ` · ${ev.recordType}` : ''}</strong>
+                    <strong>{ev.source}{rt ? ` · ${rt}` : ''}</strong>
                     <time>{timeAgo(ev.at)}</time>
                   </div>
                   {ev.detail && <p>{ev.detail}</p>}
                   <div className="dns-meta">
-                    {ev.recordType && <span className="dns-tag">Type: {ev.recordType}</span>}
-                    {ev.resolver && <span className="dns-tag">Resolver: {ev.resolver}</span>}
-                    {ev.ttl != null && <span className="dns-tag">TTL: {ev.ttl}s</span>}
-                    {ev.query && <span className="dns-tag">Query: {ev.query}</span>}
+                    {rt && <span className="dns-tag">Type: {rt}</span>}
+                    {res && <span className="dns-tag">Resolver: {res}</span>}
+                    {ttl != null && <span className="dns-tag">TTL: {ttl}s</span>}
+                    {q && <span className="dns-tag">Query: {q}</span>}
                   </div>
-                  {ev.timestamp && <p className="dim" style={{ fontSize: '11px' }}>Captured: {new Date(ev.timestamp).toISOString().replace('T', ' ').slice(0, 19)}Z</p>}
-                  {ev.raw != null && Array.isArray(ev.raw) ? (
+                  {ts && <p className="dim" style={{ fontSize: '11px' }}>Captured: {new Date(ts).toISOString().replace('T', ' ').slice(0, 19)}Z</p>}
+                  {raw != null && Array.isArray(raw) ? (
                     <details className="dns-raw">
-                      <summary>Raw ({ev.raw.length} records)</summary>
-                      <code>{ev.raw.slice(0, 10).join(', ')}{ev.raw.length > 10 ? '…' : ''}</code>
+                      <summary>Raw ({raw.length} records)</summary>
+                      <code>{raw.slice(0, 10).join(', ')}{raw.length > 10 ? '…' : ''}</code>
                     </details>
-                  ) : ev.raw != null && typeof ev.raw === 'string' ? (
-                    <p className="dim" style={{ fontSize: '11px', wordBreak: 'break-all' }}>Raw: {ev.raw} {ev.normalized && ev.normalized !== ev.raw ? `→ ${ev.normalized}` : ''}</p>
+                  ) : raw != null && typeof raw === 'string' ? (
+                    <p className="dim" style={{ fontSize: '11px', wordBreak: 'break-all' }}>Raw: {raw} {norm && norm !== raw ? `→ ${norm}` : ''}</p>
                   ) : null}
                   {ev.url && <a href={ev.url} target="_blank" rel="noreferrer">open source ↗</a>}
-                  <p className="dim" style={{ fontSize: '11px', marginTop: 4, fontStyle: 'italic' }}>Discovered via {ev.resolver || 'DNS-over-HTTPS'} for query “{ev.query || node.data.label}” — explains where and why this record was found.</p>
+                  <p className="dim" style={{ fontSize: '11px', marginTop: 4, fontStyle: 'italic' }}>Discovered via {res || 'DNS-over-HTTPS'} for query “{q || node.data.label}” — explains where and why this record was found.</p>
                 </div>
-              ))}
+                )
+              })}
               {hasMoreDns && (
                 <button className="wide" style={{ marginBottom: 8 }} onClick={() => setShowAllDns(!showAllDns)}>
                   {showAllDns ? 'Show less' : `Show all ${dnsEvs.length} DNS records (+${dnsEvs.length - 3})`}

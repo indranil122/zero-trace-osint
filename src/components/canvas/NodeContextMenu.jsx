@@ -9,6 +9,7 @@ export default function NodeContextMenu({ x, y, nodeId, onClose }) {
   const select = useCaseFile((s) => s.select)
   const { runModule } = useRunner()
   const ref = useRef(null)
+  const inFlight = useRef(false)
 
   useEffect(() => {
     const onDown = (e) => {
@@ -23,13 +24,15 @@ export default function NodeContextMenu({ x, y, nodeId, onClose }) {
     }
   }, [onClose])
 
+  async function act(fn) {
+    if (inFlight.current) return
+    inFlight.current = true
+    try { await fn() } catch {}
+    finally { inFlight.current = false; onClose() }
+  }
+
   if (!node) return null
   const meta = kindMeta(node.data.kind)
-
-  async function act(fn) {
-    try { await fn() } catch {}
-    onClose()
-  }
 
   const cx = Math.min(x, window.innerWidth - 200)
   const cy = Math.min(y, window.innerHeight - 220)

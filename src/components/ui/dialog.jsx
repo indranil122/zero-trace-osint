@@ -12,9 +12,9 @@ const DialogOverlay = React.forwardRef(({ className, onOpenChange, ...props }, r
 ))
 DialogOverlay.displayName = 'DialogOverlay'
 
-const DialogContent = React.forwardRef(({ className, children, onOpenChange, ...props }, ref) => (
+const DialogContent = React.forwardRef(({ className, children, onOpenChange, 'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledby, ...props }, ref) => (
   <div className="fixed inset-0 z-50 grid place-items-center p-4">
-    <div ref={ref} role="dialog" aria-modal="true" className={cn('relative bg-background rounded-xl shadow-xl border max-h-[90vh] overflow-auto w-full', className)} {...props}>
+    <div ref={ref} role="dialog" aria-modal="true" aria-label={ariaLabelledby ? undefined : (ariaLabel || 'Dialog')} aria-labelledby={ariaLabelledby} className={cn('relative bg-background rounded-xl shadow-xl border max-h-[90vh] overflow-auto w-full', className)} {...props}>
       {children}
       <button aria-label="Close" onClick={() => onOpenChange?.(false)} className="absolute right-3 top-3 rounded-md p-1.5 hover:bg-accent"><X className="h-4 w-4" /></button>
     </div>
@@ -23,7 +23,7 @@ const DialogContent = React.forwardRef(({ className, children, onOpenChange, ...
 DialogContent.displayName = 'DialogContent'
 
 const DialogHeader = ({ className, ...props }) => <div className={cn('flex flex-col space-y-1.5 p-6 pb-2', className)} {...props} />
-const DialogTitle = React.forwardRef(({ className, ...props }, ref) => <h3 ref={ref} className={cn('text-lg font-semibold leading-none tracking-tight', className)} {...props} />)
+const DialogTitle = React.forwardRef(({ className, id, ...props }, ref) => <h3 ref={ref} id={id || 'dialog-title'} className={cn('text-lg font-semibold leading-none tracking-tight', className)} {...props} />)
 DialogTitle.displayName = 'DialogTitle'
 const DialogDescription = React.forwardRef(({ className, ...props }, ref) => <p ref={ref} className={cn('text-sm text-muted-foreground', className)} {...props} />)
 DialogDescription.displayName = 'DialogDescription'

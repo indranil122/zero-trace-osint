@@ -349,19 +349,7 @@ export const useCaseFile = create((set, get) => ({
           source: f.source || 'unknown',
           detail: f.detail || '',
           url: f.url,
-          ...(f.meta
-            ? {
-                recordType: f.meta.recordType,
-                ttl: f.meta.ttl,
-                resolver: f.meta.resolver,
-                query: f.meta.query,
-                raw: f.meta.raw,
-                normalized: f.meta.normalized,
-                timestamp: f.meta.timestamp,
-                sourceUrl: f.meta.sourceUrl,
-                count: f.meta.count,
-              }
-            : {}),
+          ...(f.meta ? { meta: f.meta } : {}),
         }
 
         if (f.kind === '@') {

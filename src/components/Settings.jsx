@@ -43,7 +43,7 @@ export default function Settings({ onClose }) {
           />
         </label>
         <p className="dim">
-          For email, we use XposedOrNot (no key, CORS-open). For username/phone/domain, HIBP needs a key (BYO). Stored locally, never sent except to haveibeenpwned.com. Without it, exposure shows “provider unavailable” with manual-check guidance. Never displays passwords.
+          For email, we use XposedOrNot (no key, CORS-open). HIBP checks for username/phone/domain (and fallback for email) require a BYO key <em>and</em> a server-side proxy — browsers block the <code>haveibeenpwned.com</code> API directly (no CORS, forbidden headers). With this build (browser-only) those paths will show “provider unavailable”; verify manually at haveibeenpwned.com or run behind a proxy you control. Never displays passwords.
         </p>
         <div className="btn-row">
           <button

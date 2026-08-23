@@ -103,11 +103,14 @@ async function exposureEmail(email) {
       })
       return findings
     }
-    // XON returns breaches array or similar
+    // XON returns breaches array or similar — may be nested: [["Adobe","2013-10-04"],...]
     const breaches = data.breaches || data.exposedBreaches || data.Breaches || []
-    const breachList = Array.isArray(breaches) ? breaches : []
+    let breachList = Array.isArray(breaches) ? breaches : []
+    if (breachList.length && Array.isArray(breachList[0])) {
+      breachList = breachList.map((b) => (Array.isArray(b) ? { Name: b[0], BreachDate: b[1] || '', DataClasses: b.slice(2) } : b))
+    }
     if (data.status === 'breached' || breachList.length > 0 || data.breached === true) {
-      const list = breachList.length ? breachList : (Array.isArray(data) ? data : [])
+      const list = breachList.length ? breachList : (Array.isArray(data) ? (Array.isArray(data[0]) ? data.map((b) => (Array.isArray(b) ? { Name: b[0] } : b)) : data) : [])
       for (const b of list.slice(0, 12)) {
         const name = typeof b === 'string' ? b : b.Name || b.name || b.Breach || 'Unknown breach'
         const date = typeof b === 'string' ? '' : b.BreachDate || b.breachDate || b.AddedDate || ''
@@ -189,7 +192,7 @@ async function exposureEmail(email) {
 
 async function exposureEmailHibp(email, key) {
   const url = `${HIBP_BREACH_API}/${encodeURIComponent(email)}?truncateResponse=false`
-  const { status, data } = await fetchJson(url, { headers: { 'hibp-api-key': key, 'user-agent': 'zero-trace-osint' }, timeout: 10000 })
+  const { status, data } = await fetchJson(url, { headers: { 'hibp-api-key': key }, timeout: 10000 })
   if (status === 404 || !data || (Array.isArray(data) && data.length === 0)) {
     return [
       {
@@ -227,7 +230,7 @@ async function exposureDomain(domain) {
   // Try HIBP breaches?domain= — public, no key needed for this endpoint, but rate limited
   try {
     const url = `${HIBP_BREACHES_API}?domain=${encodeURIComponent(domain)}`
-    const headers = hibpKey ? { 'hibp-api-key': hibpKey, 'user-agent': 'zero-trace-osint' } : {}
+    const headers = hibpKey ? { 'hibp-api-key': hibpKey } : {}
     const { data } = await fetchJson(url, { headers, timeout: 10000 })
     const breaches = Array.isArray(data) ? data : []
     if (breaches.length === 0) {
@@ -287,8 +290,19 @@ async function exposureUsername(username) {
   }
   try {
     const url = `${HIBP_BREACH_API}/${encodeURIComponent(username)}?truncateResponse=false`
-    const { status, data } = await fetchJson(url, { headers: { 'hibp-api-key': hibpKey, 'user-agent': 'zero-trace-osint' }, timeout: 10000 })
-    if (status === 404 || !data || (Array.isArray(data) && data.length === 0)) {
+    const { status, data } = await fetchJson(url, { headers: { 'hibp-api-key': hibpKey }, timeout: 10000 })
+    if (status === 404) {
+      return [
+        {
+          kind: '@',
+          source: 'Exposure · HIBP',
+          detail: `Provider unavailable for username ${username} — HIBP returned 404. Username lookups are not reliable via this endpoint; resolve username to an email first for a definitive no-result, or verify manually at haveibeenpwned.com`,
+          url: `https://haveibeenpwned.com/`,
+          meta: { status: 'provider_unavailable', confidence: 'low', severity: 'none', provider: 'hibp', target: username },
+        },
+      ]
+    }
+    if (!data || (Array.isArray(data) && data.length === 0)) {
       return [
         {
           kind: '@',

@@ -68,7 +68,7 @@ Every edge has a label — for example, `resolves-to`, `has-subdomain`, `delegat
 
 ### Exposure — check your own data, safely
 
-A new **Exposure** module lets you check *your own* email, phone, username, domain, name, or image hash for public breach exposure — through real providers, from your browser.
+A new **Exposure** module lets you check *your own* email, phone, username, domain, or name through real providers, and image via local hash computation followed by user-performed manual lookup — from your browser.
 
 We never show passwords, tokens, or raw stolen data.
 
@@ -83,9 +83,9 @@ We clearly say which one it is:
 
 **How it works, honestly:**
 
-- **Email** — tries `api.xposedornot.com` (free, works in browser, no key). If blocked and you added a HIBP key in Settings, tries `haveibeenpwned.com` with your key.
-- **Domain** — tries `haveibeenpwned.com/api/v3/breaches?domain=` (public). Shows breaches that list this domain.
-- **Username / Phone** — requires HIBP BYO key (Settings → HIBP key). Without it, we show `provider unavailable` with guidance — we don’t fake.
+- **Email** — tries `api.xposedornot.com` (free, works in browser, no key). HIBP fallback (if you add a key in Settings) requires a server-side proxy — browsers block `haveibeenpwned.com` directly — so it will usually show `provider unavailable` in this browser-only build; verify manually if so.
+- **Domain** — public `haveibeenpwned.com/api/v3/breaches?domain=` is also browser-blocked; without a proxy the check returns `provider unavailable` (BYO key improves rate limits only behind a proxy). Shows breaches that list this domain when reachable.
+- **Username / Phone** — require HIBP BYO key <em>and</em> a server-side proxy — browsers block the API. Without a proxy, we show `provider unavailable` with guidance — we don’t fake.
 - **Image** — we compute `SHA-256` locally in your browser, show the hash, and link to check it yourself on VirusTotal. **Image never leaves your device.**
 - Respects CORS and provider limits. No shady proxies. No fake results.
 
@@ -183,7 +183,7 @@ A node is `kind:value` (like `domain:example.com` or `breach:Collection #1`) so 
 ### Honest limits
 
 - Username check = **5 platforms** (browser CORS limit; more needs a tiny proxy — planned)
-- **Exposure**: Email works without a key (XposedOrNot). Username/Phone/Domain via HIBP need your BYO HIBP key — otherwise we show `provider unavailable` and tell you where to check manually. We never fake.
+- **Exposure**: Email via XposedOrNot works without a key (browser-open). All HIBP-based checks (email fallback, domain, username, phone) need a BYO key **and** a server-side proxy — this browser-only build has no proxy, so they return `provider unavailable`; verify manually at haveibeenpwned.com or xposedornot.com. We never fake.
 - PDF is via your browser’s Print dialog (lightweight)
 - If `crt.sh` is blocked, we try 5 routes + show a clear message — try **DNS** or **Wayback** for subdomains instead
 

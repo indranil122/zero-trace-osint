@@ -38,7 +38,9 @@ export async function dnsScan(domain) {
       const answers = rawAnswers.map((a) => String(a.data))
 
       if (type === 'A' || type === 'AAAA') {
+        const expectedType = type === 'A' ? 1 : 28
         for (const ans of rawAnswers) {
+          if (ans.type !== expectedType) continue
           const ip = String(ans.data).trim()
           if (!ip) continue
           findings.push({
