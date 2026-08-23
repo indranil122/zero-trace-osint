@@ -60,11 +60,11 @@ export default function CanvasToolbar() {
 
   return (
     <div className="canvas-toolbar">
-      <button onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)">↩</button>
-      <button onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Shift+Z)">↪</button>
+      <button type="button" onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)">↩</button>
+      <button type="button" onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Shift+Z)">↪</button>
       <span className="toolbar-sep" />
-      <button onClick={() => setSearchOpen(true)} title="Quick search (Ctrl+K)">⌕</button>
-      <button onClick={exportPng} disabled={!nodes.length || exporting} title="Export graph as PNG">
+      <button type="button" onClick={() => setSearchOpen(true)} title="Quick search (Ctrl+K)">⌕</button>
+      <button type="button" onClick={exportPng} disabled={!nodes.length || exporting} title="Export graph as PNG">
         {exporting ? '…' : 'PNG'}
       </button>
       {searchOpen && <QuickSearch onClose={() => setSearchOpen(false)} />}

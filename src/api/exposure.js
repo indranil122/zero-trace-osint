@@ -46,7 +46,7 @@ function normalizeEmail(v) {
   return String(v || '').trim().toLowerCase()
 }
 function normalizePhone(v) {
-  return String(v || '').trim().replace(/[\s\-()]/g, '')
+  return String(v || '').trim().replace(/[\s\-().]/g, '')
 }
 function normalizeUsername(v) {
   return String(v || '').trim().replace(/^@+/, '')

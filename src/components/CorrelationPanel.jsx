@@ -77,11 +77,11 @@ export default function CorrelationPanel() {
     <section className="panel">
       <h2>Correlations</h2>
       <div className="btn-row" style={{ marginTop: 0 }}>
-        <button onClick={runRules}>Find links</button>
-        <button onClick={runAi}>AI pass</button>
+        <button type="button" onClick={runRules}>Find links</button>
+        <button type="button" onClick={runAi}>AI pass</button>
       </div>
       {suggestions.length > 1 && (
-        <button className="wide" onClick={acceptAll}>
+        <button type="button" className="wide" onClick={acceptAll}>
           Accept all ({suggestions.length})
         </button>
       )}
@@ -103,8 +103,8 @@ export default function CorrelationPanel() {
             </div>
             <p>{s.reason}</p>
             <div className="btn-row" style={{ marginTop: 4 }}>
-              <button onClick={() => accept(s)}>Link</button>
-              <button onClick={() => setSuggestions((prev) => prev.filter((x) => x !== s))}>
+              <button type="button" onClick={() => accept(s)}>Link</button>
+              <button type="button" onClick={() => setSuggestions((prev) => prev.filter((x) => x !== s))}>
                 Dismiss
               </button>
             </div>

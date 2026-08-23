@@ -12,6 +12,9 @@ import CorrelationPanel from './CorrelationPanel'
 import Settings from './Settings'
 import ReportModal from './ReportModal'
 import TimelineModal from './TimelineModal'
+import ThemeToggle from './ThemeToggle'
+import LegalFooter from './LegalFooter'
+import LegalModal from './legal/LegalModal'
 
 export default function Sidebar() {
   const caseName = useCaseFile((s) => s.caseName)
@@ -35,6 +38,7 @@ export default function Sidebar() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [reportMode, setReportMode] = useState(null)
   const [timelineOpen, setTimelineOpen] = useState(false)
+  const [legalTab, setLegalTab] = useState(null)
   const { runDomainModule, runUsernameHunt, runModule } = useRunner()
 
   const selected = selectedNodeId ? nodes.find((n) => n.id === selectedNodeId) : null
@@ -88,11 +92,12 @@ export default function Sidebar() {
             <h1 className="text-sm font-semibold tracking-tight">Zero-Trace</h1>
             <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">OSINT Workbench</p>
           </div>
+          <ThemeToggle />
         </div>
         <div className="flex gap-1.5">
-          <Button variant="outline" size="sm" className="flex-1 h-8 text-xs" onClick={closeCase}>← Cases</Button>
-          <Button size="sm" className="flex-1 h-8 text-xs bg-black text-white hover:bg-black/90" onClick={() => { createCase('Untitled investigation'); setDomainInput(''); setHandleInput(''); select(null) }}>+ New</Button>
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setSettingsOpen(true)}>⚙</Button>
+          <Button variant="outline" size="sm" className="flex-1 h-8 rounded-full text-xs" onClick={closeCase}>← Cases</Button>
+          <Button size="sm" className="flex-1 h-8 rounded-full text-xs bg-black text-white hover:bg-black/90 dark:bg-white dark:text-black dark:hover:bg-zinc-100" onClick={() => { createCase('Untitled investigation'); setDomainInput(''); setHandleInput(''); select(null) }}>+ New</Button>
+          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-full" onClick={() => setSettingsOpen(true)}>⚙</Button>
         </div>
       </div>
 
@@ -118,9 +123,9 @@ export default function Sidebar() {
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Domain</p>
                   {domainInput.trim() ? (
                     <p className="text-xs text-muted-foreground">→ <span className="font-medium text-foreground">{domainInput.trim()}</span></p>
-                  ) : pivotTarget ? (
-                    <p className="flex items-center gap-1 text-xs text-muted-foreground">▸ <span className="font-medium text-foreground">{pivotTarget}</span> <button onClick={() => select(null)} className="ml-1 rounded bg-muted px-1.5 py-0.5 text-[10px] hover:bg-accent">×</button></p>
-                  ) : null}
+                    ) : pivotTarget ? (
+                     <p className="flex items-center gap-1 text-xs text-muted-foreground">▸ <span className="font-medium text-foreground">{pivotTarget}</span> <button type="button" onClick={() => select(null)} className="ml-1 rounded bg-muted px-1.5 py-0.5 text-[10px] hover:bg-accent">×</button></p>
+                   ) : null}
                   <Input value={domainInput} placeholder={pivotTarget ? `New or pivot ${pivotTarget}` : 'example.com'} onChange={(e) => setDomainInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && runDomainModule('dns', normalizeValue('domain', domainInput))} className="h-8" />
                   <div className="grid grid-cols-4 gap-1.5">
                     <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => runDomainModule('dns', domainInput)}>DNS</Button>
@@ -183,7 +188,7 @@ export default function Sidebar() {
         </div>
       </Tabs>
 
-      <div className="border-t bg-muted/20 p-3 space-y-2">
+      <div className="border-t bg-muted/20 p-3 space-y-3">
         <div className="grid grid-cols-3 gap-1.5">
           <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setReportMode('analyst')}>Report</Button>
           <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setReportMode('ctf')}>CTF</Button>
@@ -195,11 +200,13 @@ export default function Sidebar() {
           <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => fileInputRef.current?.click()}>Import</Button>
           <input ref={fileInputRef} type="file" accept="application/json,.json" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) importFromFile(f); e.target.value = '' }} />
         </div>
+        <LegalFooter onOpen={setLegalTab} />
       </div>
 
       {settingsOpen && <Settings onClose={() => setSettingsOpen(false)} />}
       {reportMode && <ReportModal initialMode={reportMode} onClose={() => setReportMode(null)} />}
       {timelineOpen && <TimelineModal onClose={() => setTimelineOpen(false)} />}
+      {legalTab && <LegalModal initialTab={legalTab} onClose={() => setLegalTab(null)} />}
     </aside>
   )
 }

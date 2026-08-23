@@ -87,8 +87,8 @@ export default function NextMoves() {
             <div className="corr-pair">{m.title}</div>
             <p>{m.reason}</p>
             <div className="btn-row" style={{ marginTop: 4 }}>
-              <button onClick={() => execute(m)}>Run</button>
-              <button onClick={() => dismiss(m.key)}>Later</button>
+              <button type="button" onClick={() => execute(m)}>Run</button>
+              <button type="button" onClick={() => dismiss(m.key)}>Later</button>
             </div>
           </div>
         ))}

@@ -1,5 +1,8 @@
 import { useRef, useState } from 'react'
 import { useCaseFile } from '../store/casefile'
+import ThemeToggle from './ThemeToggle'
+import LegalFooter from './LegalFooter'
+import LegalModal from './legal/LegalModal'
 
 function timeAgo(ts) {
   const s = Math.max(1, Math.round((Date.now() - ts) / 1000))
@@ -19,6 +22,7 @@ export default function Home() {
   const importFromFile = useCaseFile((s) => s.importFromFile)
   const fileRef = useRef(null)
   const [name, setName] = useState('')
+  const [legalTab, setLegalTab] = useState(null)
 
   function create() {
     createCase(name.trim() || 'Untitled investigation')
@@ -28,12 +32,15 @@ export default function Home() {
   return (
     <div className="home">
       <div className="home-inner">
-        <div className="brand big">
-          <span className="brand-mark" />
-          <div>
-            <h1>Zero-Trace</h1>
-            <p>OSINT Workbench · local-only case files</p>
+        <div className="flex items-center justify-between gap-4">
+          <div className="brand big">
+            <span className="brand-mark" />
+            <div>
+              <h1>Zero-Trace</h1>
+              <p>OSINT Workbench · local-only case files</p>
+            </div>
           </div>
+          <ThemeToggle />
         </div>
 
         <div className="home-create">
@@ -43,8 +50,8 @@ export default function Home() {
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && create()}
           />
-          <button onClick={create}>New investigation</button>
-          <button onClick={() => fileRef.current?.click()}>Import case / vault</button>
+          <button type="button" onClick={create}>New investigation</button>
+          <button type="button" onClick={() => fileRef.current?.click()}>Import case / vault</button>
           <input
             ref={fileRef}
             type="file"
@@ -71,8 +78,8 @@ export default function Home() {
                 {c.nodeCount} entities · updated {timeAgo(c.updatedAt)}
               </div>
               <div className="case-actions">
-                <button onClick={(e) => { e.stopPropagation(); openCase(c.id) }}>Open</button>
-                <button
+                <button type="button" onClick={(e) => { e.stopPropagation(); openCase(c.id) }}>Open</button>
+                <button type="button"
                   className="danger"
                   onClick={(e) => {
                     e.stopPropagation()
@@ -88,10 +95,12 @@ export default function Home() {
           ))}
         </div>
 
-        <footer className="privacy-note center">
-          Zero server, zero accounts, zero logs. Recon queries go from this tab straight to public sources.
+        <footer className="privacy-note center space-y-3">
+          <p>Zero server, zero accounts, zero logs. Recon queries go from this tab straight to public sources.</p>
+          <LegalFooter onOpen={setLegalTab} />
         </footer>
       </div>
+      {legalTab && <LegalModal initialTab={legalTab} onClose={() => setLegalTab(null)} />}
     </div>
   )
 }

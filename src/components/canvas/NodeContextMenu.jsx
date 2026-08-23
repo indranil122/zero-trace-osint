@@ -46,14 +46,14 @@ export default function NodeContextMenu({ x, y, nodeId, onClose }) {
       {Object.entries(MODULES)
         .filter(([, mod]) => mod.accepts.includes(node.data.kind))
         .map(([key, mod]) => (
-          <button key={key} className="ctx-item" onClick={() => act(() => runModule(key, node.id, node.data.label))}>
+          <button type="button" key={key} className="ctx-item" onClick={() => act(() => runModule(key, node.id, node.data.label))}>
             Run {mod.label}
           </button>
         ))}
 
       <div className="ctx-sep" />
 
-      <button
+      <button type="button"
         className="ctx-item"
         onClick={() =>
           act(async () => {
@@ -83,7 +83,7 @@ export default function NodeContextMenu({ x, y, nodeId, onClose }) {
       >
         Copy value
       </button>
-      <button
+      <button type="button"
         className="ctx-item danger"
         onClick={() => act(() => { select(node.id); deleteNode() })}
       >

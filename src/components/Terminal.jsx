@@ -98,8 +98,8 @@ export default function Terminal() {
                 <span className="term-prompt">›</span>
                 <span className="term-move-title">{m.title}</span>
                 <span className="term-move-reason">— {m.reason}</span>
-                <button className="term-btn" onClick={() => execute(m)}>run</button>
-                <button className="term-btn ghost" onClick={() => dismiss(m.key)}>×</button>
+                <button type="button" className="term-btn" onClick={() => execute(m)}>run</button>
+                <button type="button" className="term-btn ghost" onClick={() => dismiss(m.key)}>×</button>
               </div>
             ))}
           </div>

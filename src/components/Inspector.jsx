@@ -53,7 +53,7 @@ export default function Inspector() {
     <aside className="inspector">
       <div className="inspector-head">
         <h2>Inspector</h2>
-        <button className="danger" onClick={deleteSelected}>Delete</button>
+        <button type="button" className="danger" onClick={deleteSelected}>Delete</button>
       </div>
 
       <div className="kind-row" style={{ '--node-accent': meta.color }}>
@@ -95,7 +95,7 @@ export default function Inspector() {
             {Object.entries(MODULES)
               .filter(([, mod]) => mod.accepts.includes(node.data.kind))
               .map(([key, mod]) => (
-                <button key={key} onClick={() => runModule(key, node.id, node.data.label)}>
+                <button type="button" key={key} onClick={() => runModule(key, node.id, node.data.label)}>
                   {mod.label.split(' ')[0]}
                 </button>
               ))}
@@ -137,7 +137,7 @@ export default function Inspector() {
       )}
 
       <div className="btn-row">
-        <button
+        <button type="button"
           className="wide"
           onClick={() => {
             navigator.clipboard?.writeText(node.data.label || '')
@@ -252,7 +252,7 @@ export default function Inspector() {
                 )
               })}
               {hasMoreDns && (
-                <button className="wide" style={{ marginBottom: 8 }} onClick={() => setShowAllDns(!showAllDns)}>
+                <button type="button" className="wide" style={{ marginBottom: 8 }} onClick={() => setShowAllDns(!showAllDns)}>
                   {showAllDns ? 'Show less' : `Show all ${dnsEvs.length} DNS records (+${dnsEvs.length - 3})`}
                 </button>
               )}

@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { ReactFlowProvider } from '@xyflow/react'
 import { useCaseFile } from './store/casefile'
+import { ThemeProvider } from './lib/theme'
 import FlowCanvas from './components/canvas/FlowCanvas'
 import Sidebar from './components/Sidebar'
 import Inspector from './components/Inspector'
@@ -43,5 +44,9 @@ export default function App() {
     return <div className="boot">Unlocking local case files…</div>
   }
 
-  return <ReactFlowProvider>{activeId ? <Workspace /> : <Home />}</ReactFlowProvider>
+  return (
+    <ThemeProvider>
+      <ReactFlowProvider>{activeId ? <Workspace /> : <Home />}</ReactFlowProvider>
+    </ThemeProvider>
+  )
 }

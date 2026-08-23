@@ -53,7 +53,7 @@ function lightEntry(rec) {
 
 function replaceNode(nodes, byId, node, mapData) {
   const next = { ...node, data: mapData(node.data) }
-  const idx = nodes.indexOf(node)
+  const idx = nodes.findIndex((n) => n.id === node.id)
   if (idx >= 0) nodes[idx] = next
   byId.set(next.id, next)
   return next

@@ -13,7 +13,11 @@ export const MODULES = {
   rdap: { label: 'WHOIS · RDAP', accepts: ['domain'], scan: (t) => rdapScan(t) },
   certs: { label: 'Certificates', accepts: ['domain', 'subdomain'], scan: (t) => crtshScan(t) },
   wayback: { label: 'Wayback Machine', accepts: ['domain', 'subdomain'], scan: (t) => waybackScan(t) },
-  exposure: { label: 'Exposure check', accepts: ['email', 'phone', 'username', 'domain', 'name', 'image'], scan: (t) => exposureScan({ kind: 'email', value: t }) },
+  exposure: {
+    label: 'Exposure check',
+    accepts: ['email', 'phone', 'username', 'domain', 'name', 'image'],
+    scan: (t, kind = 'email') => exposureScan({ kind, value: t }),
+  },
 }
 
 const imageFileByNode = new Map()

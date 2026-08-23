@@ -23,7 +23,7 @@ export default function TimelineModal({ onClose }) {
       <div className="modal timeline" role="dialog" aria-modal="true" aria-label="Timeline" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h2>Timeline · {events.length} events</h2>
-          <button className="icon-close" onClick={onClose} aria-label="Close">×</button>
+          <button type="button" className="icon-close" onClick={onClose} aria-label="Close">×</button>
         </div>
 
         <div className="report-body">

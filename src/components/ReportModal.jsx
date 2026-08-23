@@ -81,14 +81,14 @@ export default function ReportModal({ initialMode = 'analyst', onClose }) {
       <div className="modal report" role="dialog" aria-modal="true" aria-label="Investigation report" onClick={(e) => e.stopPropagation()}>
         <div className="report-head">
           <div className="seg">
-            <button className={mode === 'analyst' ? 'tab active' : 'tab'} onClick={() => setMode('analyst')}>
+            <button type="button" className={mode === 'analyst' ? 'tab active' : 'tab'} onClick={() => setMode('analyst')}>
               Analyst report
             </button>
-            <button className={mode === 'ctf' ? 'tab active' : 'tab'} onClick={() => setMode('ctf')}>
+            <button type="button" className={mode === 'ctf' ? 'tab active' : 'tab'} onClick={() => setMode('ctf')}>
               CTF writeup
             </button>
           </div>
-          <button className="icon-close" onClick={onClose} aria-label="Close">×</button>
+          <button type="button" className="icon-close" onClick={onClose} aria-label="Close">×</button>
         </div>
 
         <div className="report-body">
@@ -96,11 +96,11 @@ export default function ReportModal({ initialMode = 'analyst', onClose }) {
         </div>
 
         <div className="report-actions">
-          <button className="btn-primary" onClick={generateAiSummary} disabled={busy}>
+          <button type="button" className="btn-primary" onClick={generateAiSummary} disabled={busy}>
             {busy ? 'Thinking…' : aiNarrative ? 'Regenerate AI summary' : 'Generate AI summary'}
           </button>
-          <button onClick={download}>Download .md</button>
-          <button onClick={printPdf}>Print / Save PDF</button>
+          <button type="button" onClick={download}>Download .md</button>
+          <button type="button" onClick={printPdf}>Print / Save PDF</button>
         </div>
       </div>
     </div>,

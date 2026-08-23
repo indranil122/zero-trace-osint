@@ -17,7 +17,7 @@ export default function Settings({ onClose }) {
       <div className="modal" role="dialog" aria-modal="true" aria-label="Settings" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h2>Settings</h2>
-          <button className="icon-close" onClick={onClose} aria-label="Close">×</button>
+          <button type="button" className="icon-close" onClick={onClose} aria-label="Close">×</button>
         </div>
         <label className="field">
           <span>Anthropic API key (optional, enables AI features)</span>
@@ -50,7 +50,7 @@ export default function Settings({ onClose }) {
           blocks browsers by design, so it may still show &ldquo;provider unavailable&rdquo; without a proxy you control.
         </p>
         <div className="btn-row">
-          <button
+          <button type="button"
             className="wide"
             onClick={() => {
               setStoredKey(key.trim())
@@ -60,7 +60,7 @@ export default function Settings({ onClose }) {
           >
             Save keys
           </button>
-          <button
+          <button type="button"
             className="wide danger"
             onClick={() => {
               setStoredKey('')
