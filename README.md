@@ -1,217 +1,253 @@
-# Zero-Trace OSINT Workbench
+# VeilTrace Workbench
 
-> **Your complete personal investigation workbench — in your browser. No backend or server-side storage — case data and activity logs stay in your browser's IndexedDB, and queries go directly from your browser to public sources. Discover → Correlate → Verify → Check Exposure → Pivot → Report.**
+> **Private OSINT investigation workbench. Runs entirely in the browser. No backend, no logs, no accounts. Graph-first recon with full evidence trails and verifiable exposure checks.**
 
 [![Vite](https://img.shields.io/badge/Vite-646CFF?logo=vite&logoColor=white)](https://vitejs.dev)
 [![React 19](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev)
 [![Tailwind + shadcn](https://img.shields.io/badge/UI-Tailwind_shadcn-black)](https://ui.shadcn.com)
 [![License MIT](https://img.shields.io/badge/License-MIT-green)](LICENSE)
-[![No Backend](https://img.shields.io/badge/Privacy-100%25_Browser_Only-black)](#)
-[![PWA Ready](https://img.shields.io/badge/PWA-Installable-blue)](public/manifest.webmanifest)
+[![Privacy](https://img.shields.io/badge/Privacy-100%25_Browser_Only-black)](#transparency--data-sources)
+[![PWA](https://img.shields.io/badge/PWA-Installable-blue)](public/manifest.webmanifest)
 
-**Live demo:** `npm run dev` → http://localhost:5173 — the app shell and your saved cases stay usable offline after the first load; scans and investigations need network access.
-
----
-
-### What is this?
-
-Zero-Trace is a free, private tool to investigate domains, usernames, emails, phones, names and images. You type something, it talks directly to public sources and draws everything as a clean graph you can click and explore.
-
-Most tools send your search to *their* server. This one does not. Your search goes straight from your browser to the public source. Nothing is saved on any server — only on your own computer.
-
-**In one sentence:** *Type a domain → see DNS, WHOIS, certificates, archives, breach exposure and links — as dots and lines you can pivot from.*
-
-It now feels like a full workbench: **Discover → Correlate → Verify Evidence → Identify Exposure → Pivot → Report.**
+**Live:** `npm run dev` → http://localhost:5173. App shell and saved cases work offline after first load. All scans require network. `dist/` is static and deploys to Netlify, Vercel, or GitHub Pages.
 
 ---
 
-### Who is it for?
+### What VeilTrace Does
 
-- **CTF players** — fast recon + one-click report for writeups
-- **Students** — learn how real investigations work, visually
-- **Researchers** — keep your own trace private while you investigate
-- **Anyone checking their own exposure** — see if your email/phone/domain appeared in public breaches, safely
+VeilTrace is a local-first workbench for OSINT recon. Enter a domain, email, username, phone, name, or image. The app queries public sources directly from the browser, renders every finding as a node on an interactive graph, and lets the operator pivot, correlate, verify, and export.
 
----
+The core flow is **Discover → Correlate → Verify → Exposure → Pivot → Report**. Every finding retains its source, timestamp, resolver, TTL, raw data, and URL.
 
-### Why it is different
-
-1. **Truly private.** No backend, no database, no logs. All data lives in your browser (IndexedDB). Close the tab, reopen — your case is still there, locally.
-2. **You see the graph, not a table.** Every finding becomes a node. A domain connects to its IPs, subdomains, emails, breaches. Drag to link, right-click to run the next check.
-3. **Every finding keeps its proof.** Each dot remembers *where* it came from, *when*, TTL, resolver, raw data, and a link to the source. Reports include this evidence.
-4. **Smart first, AI second.** Simple rules link things instantly for free (same email on two accounts = linked). AI is only used when you ask it to.
-
-Same core, same privacy — just more complete.
+No data is sent to a VeilTrace server. There is no VeilTrace server.
 
 ---
 
-### What you can do
+### Audience
 
-| You do | What happens | Example |
+- CTF players needing fast recon and one-click writeups
+- Students learning real investigative workflows visually
+- Researchers and analysts requiring privacy for their own trace
+- Individuals verifying their own exposure in public breach data
+
+---
+
+### Capabilities
+
+| Action | Result | Example |
 |---|---|---|
-| **Type a domain → DNS** | Shows A, AAAA, CNAME, MX, TXT… with TTL, resolver, query, time and raw data. A/AAAA IPs are grouped and placed neatly below the domain. | `supermynd.in` → 3 IPs grouped, `TTL 300s via dns.google` |
-| **WHOIS / RDAP** | Who owns it, when it was made, registrar | Shows `ns1.dns-parking.com` |
-| **Certificates** | Finds hidden subdomains from SSL logs (5-route fallback) | `api.example.com` appears |
-| **Wayback** | Finds old pages and subdomains | Archived URLs |
-| **Username hunt** | Checks 5 platforms where browser allows | GitHub, GitLab, Reddit, npm, Keybase |
-| **Email** | Finds contact emails via RDAP and checks if a Gravatar is associated with the email address hash | `jdoe@example.com` → hash `5d4140…` → avatar? |
-| **Email / Phone / Username / Domain / Name** | **Exposure check** — breaches + infostealer logs (email/username/domain) and full phone intel with pivots — all key-free | See below |
-| **Image drop** | Reads camera, date, GPS **locally** — never uploads. For exposure, we hash the image locally and point you to check the hash yourself. | EXIF stays on device, SHA-256 shown |
-| **Correlate** | Links overlap (same IP, same handle, same breach) | `High/Medium` confidence + reason |
-| **AI (optional)** | Claude pass for fuzzy matches + summary | Needs your own Anthropic key |
+| **DNS** | A, AAAA, CNAME, MX, NS, TXT, SOA with TTL, resolver, query, time, raw→normalized, deduped IPs clustered | `example.com` → `TTL 300s via dns.google` |
+| **WHOIS / RDAP** | Registrar, status, events, contacts, nameservers | `RDAP: Registered 1995-08-27` |
+| **Certificates** | Hidden subdomains from CT logs, 5-route fallback, worker-parsed | `api.example.com` from crt.sh |
+| **Wayback** | Archived URLs and hostnames via CDX | `2 archived hosts` |
+| **Username hunt** | 18 platforms via open APIs (GitHub, GitLab, Reddit, npm, Keybase, HN, Dev.to, PyPI, Docker Hub, etc.) | `github/jdoe` hit |
+| **Email** | Contact extraction via RDAP, Gravatar probe (MD5) | `5d4140… → avatar found` |
+| **Dork generator** | Google/Bing/DDG/Yandex dorks per entity (no key, no network) | `site:example.com` |
+| **Image drop** | EXIF via `exifr` locally — camera, lens, GPS, capture time — never uploaded | `GPS 12.34, 56.78` |
+| **Exposure** | Breach + infostealer checks, phone intel (offline + live), image hash | See Transparency table |
+| **Correlate** | Deterministic rules (shared IP/NS, email→domain, handle match) + optional Claude pass | `High / Medium / Low + reason` |
+| **Timeline** | Chronological view with range and milestone filters | `Registered — example.com` |
+| **Report** | Analyst, CTF, Abuse templates — Markdown + Print/PDF, evidence and exposure sections | One click |
+| **Canvas** | Infinite graph, mini-map, search `Ctrl+K`, right-click pivots, undo `Ctrl+Z`, PNG export | Drag to link |
 
-**DNS is now detailed:** Click any domain → Inspector shows record type (A/AAAA…), resolver (`dns.google` vs `cloudflare`), TTL, exact query, timestamp, source URL, and raw → normalized value. Large A/AAAA results are deduplicated and collapsed (show 3 → expand to all), and IPs are placed in a tight cluster — you always know *where and why* it was discovered.
-
-Every edge has a label — for example, `resolves-to`, `has-subdomain`, `delegates-to`, `registrant-contact`, `found-on`/`handle-of`, `hosted-at`, `mentions-email`, `related-to`, `exposed-in`/`affects`, and `correlated`.
-
----
-
-### Exposure — check your own data, safely
-
-A new **Exposure** module lets you check *your own* email, phone, username, domain, or name through real providers, and image via local hash computation followed by user-performed manual lookup — from your browser.
-
-We never show passwords, tokens, or raw stolen data.
-
-We show: **breach/incident name, date, what was exposed, source, confidence, severity.**
-
-We clearly say which one it is:
-
-- **Confirmed exposure** — provider says this exact value was in a breach
-- **Possible match** — name/phone is not unique, or breach affects domain broadly
-- **No result** — provider says no known breach for this value
-- **Intel** — context gathered (risk scores, carrier info, pivots) that isn't a breach verdict
-- **Provider unavailable** — CORS/network blocked — we tell you how to check manually
-
-**How it works — everything below is key-free:**
-
-- **Email** — two providers, three checks/endpoints in parallel (all free & CORS-open): `XposedOrNot` breach check plus **breach analytics** (same provider, two endpoints) and `Hudson Rock` **infostealer-log check** (was this mailbox on an infected computer?). HIBP is a conditional fallback if you add a key in Settings, not a parallel provider.
-- **Username** — `Hudson Rock` stealer-log search (free, no key): does this handle appear on machines owned by infostealers? HIBP-style catalogs need a server proxy (their API blocks browsers by design) — we say so instead of faking it.
-- **Domain** — HIBP's public breach catalog filtered by domain (`Access-Control-Allow-Origin: *`, verified), with XposedOrNot's catalog as automatic fallback.
-- **Phone** — full **Phone Intel**, zero keys:
-  1. Offline parse via libphonenumber — validity, country, line type (mobile/VoIP/fixed), all formats (fully local)
-  2. Live enrichment via phone-number-api.com — **carrier, region, timezone, disposable-number flag** — notice: this step sends the entered phone number off-device to a third-party API
-  3. User-initiated pivot searches to third-party services — Truecaller, Sync.me, WhatsApp probe, Google/Bing/DDG/Yandex dorks across every format variant, DeHashed leak search (each lookup is sent only when you click it)
-  - No free API exposes phone-breach data from a browser — we give you the manual-check links instead of fake results.
-- **Image** — we compute `SHA-256` locally in your browser, show the hash, and link to check it yourself on VirusTotal. **Image never leaves your device.**
-- Respects CORS and provider limits. No shady proxies. No fake results.
-
-Findings go straight into your graph: `email → exposed-in → Breach` (red `🔓` node), with evidence that includes status, confidence, severity. Next Moves will suggest it, Inspector explains it — phone pivots render as clickable chips right inside the Inspector. Reports include an **Exposure Intelligence** section.
-
-Keys are optional extras (Anthropic for AI, HIBP for an extra email fallback) — stored only in `localStorage`.
+Every edge is labeled: `resolves-to`, `has-subdomain`, `delegates-to`, `registrant-contact`, `found-on`, `handle-of`, `hosted-at`, `mentions-email`, `related-to`, `exposed-in`, `affects`, `correlated`, `dork`.
 
 ---
 
-### The canvas — how it feels
+### Exposure Module
 
-- **Graph canvas** — infinite, smooth (Lenis) at your screen’s refresh rate. Drag from a dot’s handle to link.
-- **Search** — `Ctrl+K` to jump to any dot.
-- **Right-click** — run DNS/WHOIS/Certs/Exposure on that dot.
-- **Undo / Redo** — `Ctrl+Z` / `Ctrl+Shift+Z` (50 steps).
-- **Export image** — one click PNG of the whole graph.
-- **Terminal at bottom** — always shows logs + “next steps” (including exposure) suggestions. No hidden panels.
+VeilTrace shows breach name, date, data classes, source, confidence, and severity. Raw passwords, tokens, and cookies are never displayed.
 
-Sidebar is clean: 3 tabs — **Investigate / Build / Intel** — plus a dedicated **Exposure** card (pick kind → type value → Check). All actions fit on screen.
+Statuses are explicit:
 
-Design: **Apple-like black-on-white** with shadcn/ui, Tailwind. Calm, readable.
+- **Confirmed** — provider confirms this exact value in a breach
+- **Possible** — name/phone/domain-wide match, not unique
+- **No result** — provider reports no known exposure
+- **Intel** — context (risk, carrier, pivots), not a verdict
+- **Provider unavailable** — CORS or rate limit blocked, with manual check URL
 
----
-
-### Reports — one click
-
-- **Analyst report** — executive summary, overview, entities + detailed DNS evidence, **Exposure Intelligence** (breaches with status/severity/confidence), correlations, notes.
-- **CTF writeup** — methodology + findings, ready to submit.
-- Download as **.md**, or **Print / Save as PDF** from your browser.
-
-If you add an Anthropic key (Settings), you can generate an AI summary.
+All exposure checks run key-free in the browser except the optional HIBP and Anthropic extras.
 
 ---
 
-### Your data stays yours
+### Transparency — Data Sources
 
-- Auto-save every 350ms to `IndexedDB` (`zerotrace-workbench`).
-- Many cases supported. Last open case remembered.
-- Export plain: `.zerotrace.json`
-- Export locked: `.ztvault.json` — **AES-256-GCM**, PBKDF2 250,000 rounds, random salt & IV (Web Crypto). No password recovery.
-- Import always creates a **new** case — never overwrites.
+All network calls originate from the browser tab. No proxy is inserted by VeilTrace. Closing the tab stops all traffic.
 
-PWA: install to desktop. Works offline to view saved cases.
+| Module | Provider & Endpoint | Data Sent | Key | CORS | Rate Limit | Notes |
+|---|---|---|---|---|---|---|
+| **DNS** | `https://dns.google/resolve` and `https://cloudflare-dns.com/dns-query` (DoH JSON) | Domain string | None | Yes | Provider-enforced | Dual resolver, 10s timeout, TTL+resolver recorded |
+| **WHOIS RDAP** | `https://rdap.org/domain/{domain}` | Domain string | None | Yes | Provider-enforced | Follows redirects, extracts vCard and events |
+| **Certificates** | `https://crt.sh/?q={domain}&output=json` via 5 routes (direct + 4 CORS proxies) | Domain string | None | Via proxies when blocked | Provider-enforced | Parsed in Web Worker `src/workers/crtsh.worker.js` |
+| **Wayback** | `https://archive.org/wayback/available` and `https://web.archive.org/cdx/search/cdx` | Domain string | None | Yes | Provider-enforced | CDX hostname filter |
+| **Username** | `api.github.com`, `gitlab.com/api/v4`, `reddit.com`, `registry.npmjs.org`, `keybase.io`, `hacker-news.firebaseio.com`, `dev.to`, `pypi.org`, `hub.docker.com`, etc. (18 total) | Username string | None | Varies per provider | Per-provider | `src/api/username.js` — `false`=not found, `null`=inconclusive |
+| **Gravatar** | `https://www.gravatar.com/avatar/{md5}?d=404` | MD5 of lowercased email (not plaintext) | None | Yes | Provider-enforced | Image probe, 8s timeout `src/api/gravatar.js` |
+| **Email breach** | `https://api.xposedornot.com/v1/check-email/{email}` and `v1/breach-analytics?email=` | Email (lowercased) | None | Yes | 2/s, 25/h, 100/d | Parallel with Hudson Rock `src/api/exposure.js` |
+| **Stealer logs (email/username)** | `https://cavalier.hudsonrock.com/api/json/v2/osint-tools/search-by-{email,username}` | Email or username | None | Yes | Provider-enforced | Never shows credentials |
+| **Domain breach catalog** | `https://haveibeenpwned.com/api/v3/breaches?domain={domain}` and fallback `api.xposedornot.com/v1/breaches?domain=` | Domain string | None | HIBP catalog is `*` CORS; XON is fallback | Provider-enforced | HIBP keyed `breachedaccount` is intentionally not used from browser (no CORS by policy) |
+| **Phone offline** | `libphonenumber-js` in-browser | None (local) | None | N/A | N/A | Validity, line type, E.164/international/national/RFC3966 |
+| **Phone live** | `https://demo.phone-number-api.com/json/?number={e164}` | E.164 without `+` | None | Yes | 5/min free | Carrier, timezone, region, disposable flag. Offline result remains if this fails |
+| **Phone pivots** | Truecaller, Sync.me, `wa.me`, Google/Bing/DDG/Yandex, DeHashed, HIBP (links only) | Click opens link in new tab | None | N/A (user-initiated) | N/A | Shown as chips in Inspector |
+| **Image EXIF** | `exifr` in-browser | None (local) | None | N/A | N/A | Camera/lens/GPS/date, `src/api/exif.js` |
+| **Image hash** | `crypto.subtle.digest(SHA-256)` local, VirusTotal link `https://www.virustotal.com/gui/search/{hash}` | None until user clicks link | None | N/A | N/A | Hash displayed locally |
+| **Dork generator** | No network — URL builder `src/api/dorks.js` | None until click | None | N/A | N/A | Opens Google/Bing/DDG/Yandex in new tab |
+| **AI correlation + summary** | `https://api.anthropic.com/v1/messages` with `anthropic-dangerous-direct-browser-access: true` | Summarized entity list (kind+label, up to 150) | Yes — user BYO Anthropic key (`localStorage zt-anthropic-key`) | Yes | Anthropic account limits | Optional, never called without a key `src/api/ai.js` |
+| **Optional HIBP fallback** | `https://haveibeenpwned.com/api/v3/breachedaccount/{email}` | Email | Yes — HIBP key (`zt-hibp-key`) | No (keyed endpoint blocks browsers by design → shows provider unavailable) | HIBP policy | Not a parallel provider; XposedOrNot remains primary |
+| **Local lock** | `localStorage veiltrace-lock-salt/hash` (PBKDF2 250k, local only) | Password hash only | None | N/A | N/A | One-time browser gate, shown once for internal sharing. Change in Settings |
 
----
-
-### Try it in 30 seconds
-
-Need **Node 18+** (built on Node 24).
-
-```bash
-npm install
-npm run dev      # http://localhost:5173
-```
-
-Other commands:
-
-```bash
-npm run test     # 33 checks, no browser needed
-npm run lint     # oxlint
-npm run build    # → dist/  (fully static)
-npm run preview  # serve dist/ locally
-```
+No analytics, no telemetry, no cookies. Keys live only in `localStorage`. Clearing site data removes everything.
 
 ---
 
-### Deploy anywhere — no server needed
+### Design
 
-`dist/` is just static files. Works on:
-
-- **Netlify** — `netlify.toml` included
-- **Vercel** — `vercel.json` included
-- **GitHub Pages** — `base: './'` already set
-
-Just drag `dist/` or `npm run build` on the host.
+Black-on-white, Apple-inspired. Frosted glass, hairline borders, spring motion, `shadcn/ui` + Tailwind 4. Dense where needed, airy where it counts. Dark mode via `prefers-color-scheme` and manual toggle. `Lenis` smooth scroll, `React Flow` canvas at refresh rate, `50-step` undo, `Ctrl+K` search, context menus, PNG export. Mobile is a first-class shell: top bar, bottom dock (Tools / Graph / Details / Log), left/right drawers, collapsible execution sheet with up/down controls, 44px touch targets, safe-area insets, fluid `dvh/svh`.
 
 ---
 
-### How it is built (simple)
+### Architecture
 
 ```
 src/
-  api/        talks to public sources (dns with TTL/resolver, rdap, crtsh, wayback, username, exif, gravatar, exposure via XposedOrNot/Hudson Rock/HIBP + phone intel via libphonenumber & pivots, ai)
-  engine/     plain logic: linking rules (incl. exposed-in), next-step suggestions (incl. exposure), timeline, reports (incl. Exposure Intelligence)
-  store/      one Zustand store + IndexedDB (cases, incl. breach nodes, 50-step undo)
-  workers/    crt.sh parsing off the main thread
-  components/ UI — sidebar (with Exposure), canvas (grouped DNS), inspector (detailed DNS + breach), terminal, modals
-  utils/      kinds (domain… breach… name…), crypto (vault), md5
+  api/        dns, rdap, crtsh, wayback, username (18), exif, gravatar, dork, exposure (XON/Hudson/HIBP/phone), phone, ai
+  engine/     correlate (rules + AI), nextmoves, timeline, report (analyst/ctf/abuse), useRunner (MODULES registry)
+  store/      Zustand + IndexedDB (veiltrace-workbench), 50-step history, last-active case
+  workers/    crtsh.worker.js (CT parsing off main thread)
+  components/ Sidebar (Investigate/Build/Intel + Exposure), Inspector (TTL/resolver/dorks/phone/reverse-image), Terminal (execution table), canvas (FlowCanvas, EntityNode, NodeContextMenu, CanvasToolbar, QuickSearch), mobile (MobileNav), legal, ui
+  utils/      kinds (normalize + id + edge labels), crypto (AES-256-GCM PBKDF2 250k), md5
+public/      manifest.webmanifest, sw.js (network-first nav, offline shell), icon.svg
 ```
 
-A node is `kind:value` (like `domain:example.com` or `breach:Collection #1`) so the same thing never duplicates. Graph, storage, and privacy design are unchanged — just more capable.
+A node is `kind:value` (`domain:example.com`, `breach:Collection #1`) — deterministic dedup. Evidence is appended per finding with `at, source, detail, url, meta`.
+
+Build is `Vite 6+` + `React 19` + `Tailwind 4`. No backend exists.
 
 ---
 
-### Honest limits
+### Build From Source
 
-- Username check = **5 platforms** (browser CORS limit; more needs a tiny proxy — planned)
-- **Exposure**: email (XposedOrNot + Hudson Rock), domain (HIBP public catalog + XON fallback), and full phone intel (offline parse, carrier lookup, pivots) all work key-free. HIBP's authenticated APIs block browsers by design (no CORS for keyed endpoints), so the optional HIBP email fallback and username-level catalogs may show `provider unavailable` — we never fake.
-- PDF is via your browser’s Print dialog (lightweight)
-- If `crt.sh` is blocked, we try 5 routes + show a clear message — try **DNS** or **Wayback** for subdomains instead
-- Phone live-carrier lookups: free tier is 5/minute; offline analysis always works regardless
+Requirements: Node 18+ (tested on 24).
 
-Details: `docs/GAP-ANALYSIS.md` → `docs/ROADMAP.md`.
+```bash
+npm install
+npm run dev        # http://localhost:5173
+npm run test       # 34 engine checks, no browser
+npm run lint       # oxlint
+npm run build      # → dist/ static
+npm run preview    # serve dist/ locally
+```
+
+Deploy `dist/` to any static host. Configs included: `netlify.toml`, `vercel.json`, `base: './'` for GitHub Pages.
 
 ---
 
-### Is it legal?
+### Collaborate
 
-For **authorized research, CTFs, learning, and checking your own exposure only**. You must follow the law and each source’s terms. Don’t scan what you don’t have permission to investigate. Never use breach data to harm.
+Contributions are welcome. The goal is to keep VeilTrace private, verifiable, and fast.
+
+**Ways to contribute**
+
+- Fix a bug or polish mobile/browser quirks
+- Add a CORS-open data source with evidence and docs
+- Improve correlation rules or next-move suggestions
+- Add tests in `scripts/selftest.mjs` or Playwright E2E
+- Improve docs, types, or a11y
+
+**Process**
+
+1. Fork and branch from `main`
+2. Run `npm install && npm run test && npm run lint && npm run build` before pushing
+3. Keep changes focused. One feature or fix per pull request
+4. Include evidence examples and update the Transparency table when adding a source
+5. For new modules, register in `src/engine/useRunner.js` `MODULES` — the single source of truth for pivots
+6. For UI changes, test at `320px`, `768px`, `1024px`, and `1440px` with both themes
+
+**Conventions**
+
+- Direct, verifiable language in code and docs. No indirect requests or open questions in UI copy
+- Evidence first: every finding must carry source, time, and URL
+- Privacy first: no outbound call without user action. No tracking
+- Performance: heavy parsing in workers, lazy-load heavy modals
+
+**Local development tips**
+
+- Use `zt-anthropic-key` and `zt-hibp-key` in `localStorage` for optional AI/HIBP. Everything else works without keys
+- `IndexedDB` database is `veiltrace-workbench` (legacy `zerotrace-workbench` is migrated automatically)
+- Clear data: DevTools → Application → IndexedDB / Local Storage → Clear site data
 
 ---
 
-### Tags / Keywords
+### Local Lock — One-Time Browser Gate
 
-`osint` `recon` `osint-tool` `ctf` `security` `investigation` `graph` `browser-only` `privacy` `no-backend` `pwa` `react` `vite` `tailwindcss` `shadcn-ui` `lenis` `indexeddb` `certificate-transparency` `whois` `dns` `dns-investigation` `ttl` `wayback-machine` `exif` `breach` `exposure` `haveibeenpwned` `xposedornot` `hudson-rock` `infostealer` `phone-number-lookup` `phone-intel` `libphonenumber` `personal-osint`
+VeilTrace gates the workbench with a local password on first start. The flow is browser-only.
 
-Add these as **GitHub Topics** (Repo → Settings → Topics) to help people find it.
+- On first launch, set a local password (min 8 chars). It is hashed with PBKDF2 250k + random salt and stored in `localStorage` of this browser. No server.
+- The password is shown once for internal sharing. Copy it over a private channel — it will not be shown again.
+- Each browser has its own gate. Team members set their own passwords on their own browsers. The gate does not sync or leave the device.
+- Change or remove the gate anytime in Settings → Local lock (requires current password, or reset).
+- Resetting the gate does not delete cases. Forgetting the password requires reset.
+
+This gate protects browser storage only. It does not encrypt cases at rest — use Vault export for encrypted at-rest storage.
+
+### Case Files
+
+- Auto-save every 350ms to `IndexedDB`
+- Multiple cases, last-open remembered
+- Export plain `.veiltrace.json` (also imports legacy `.zerotrace.json`)
+- Export vault `.vtvault.json` — AES-256-GCM, PBKDF2 250k, random salt & IV (Web Crypto). No recovery
+- Import always creates a new case
+
+PWA: install to desktop, view saved cases offline.
+
+---
+
+### Limits
+
+- Username hunt: 18 platforms in-browser. Full Sherlock-scale requires a relay worker
+- Exposure: HIBP keyed `breachedaccount` and username catalog remain proxy-only by provider policy — shown as provider unavailable, never faked
+- PDF via browser Print dialog. PNG graph export is included
+- crt.sh may need a retry; fallback routes and clear messaging are included. Use DNS or Wayback as alternates for subdomains
+- Phone live carrier: 5/min free tier. Offline parse always works
+
+---
+
+### Legal — Localhost Pages
+
+All legal pages live at `localhost` and work offline. No external navigation.
+
+- Privacy: `http://localhost:5173/#privacy`
+- Terms: `http://localhost:5173/#terms`
+- GDPR: `http://localhost:5173/#gdpr`
+- CCPA: `http://localhost:5173/#ccpa`
+- Data Compliance: `http://localhost:5173/#data`
+- IP Check: `http://localhost:5173/#ip`
+- Trademark Check: `http://localhost:5173/#tm`
+
+Click any link in the footer (Privacy · Terms · GDPR · CCPA · Data · IP Check · Trademark) — the URL hash updates and the page opens as a modal. Direct hash access works on reload and after `npm run build`. No social or tracking links are present on the website. The site contains zero outbound social navigation.
+
+### External Links — GitHub Only
+
+The website contains no social links. The following are documented here for contributors and reviewers, not rendered in the app:
+
+- Repository: `https://github.com/indranil122/zero-trace-osint`
+- Issues and pull requests: `https://github.com/indranil122/zero-trace-osint/issues`
+- Discussions: `https://github.com/indranil122/zero-trace-osint/discussions` (if enabled)
+- Live deployments (static `dist/`): Netlify, Vercel, GitHub Pages — see `netlify.toml` and `vercel.json`
+
+Data source endpoints are listed in the Transparency table above. Those are provider APIs contacted only when the operator runs a module, directly from the browser tab. No social platform is contacted by the app itself.
+
+### Legal Notice
+
+Authorized research, CTFs, learning, and self-exposure checks only. Obey the law and each provider's terms. Do not scan without authorization. Do not use breach data to harm. Verify every finding against its primary source before acting.
 
 ---
 
 ### License
 
-**MIT** — see [LICENSE](LICENSE). Free to use, copy, and learn from.
+MIT — see `LICENSE`. Free to use, copy, and learn from.
+
+### Keywords
+
+`osint` `recon` `osint-tool` `ctf` `security` `investigation` `graph` `browser-only` `privacy` `no-backend` `pwa` `react` `vite` `tailwindcss` `shadcn-ui` `lenis` `indexeddb` `certificate-transparency` `whois` `dns` `ttl` `wayback-machine` `exif` `breach` `exposure` `haveibeenpwned` `xposedornot` `hudson-rock` `infostealer` `phone-number-lookup` `phone-intel` `libphonenumber` `dork-generator` `veiltrace`
+
+Add these as GitHub Topics to help discovery.

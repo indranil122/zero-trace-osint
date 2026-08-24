@@ -24,7 +24,7 @@ export default function TrademarkCheck() {
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Zero-Trace, Acme™ …"
+          placeholder="VeilTrace, Acme™ …"
           className="h-9 flex-1 rounded-full border border-input bg-background px-4 text-sm"
         />
         <span className="inline-flex h-9 items-center rounded-full border bg-muted px-3 text-xs text-muted-foreground">{q.trim() ? `${q.trim().length} chars` : 'type a mark'}</span>

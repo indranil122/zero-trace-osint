@@ -1,8 +1,8 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, lazy, Suspense, useEffect } from 'react'
 import { useCaseFile } from '../store/casefile'
 import ThemeToggle from './ThemeToggle'
 import LegalFooter from './LegalFooter'
-import LegalModal from './legal/LegalModal'
+const LegalModal = lazy(() => import('./legal/LegalModal'))
 
 function timeAgo(ts) {
   const s = Math.max(1, Math.round((Date.now() - ts) / 1000))
@@ -24,6 +24,20 @@ export default function Home() {
   const [name, setName] = useState('')
   const [legalTab, setLegalTab] = useState(null)
 
+  useEffect(() => {
+    const ids = new Set(['privacy', 'terms', 'gdpr', 'ccpa', 'data', 'ip', 'tm'])
+    const sync = () => {
+      try {
+        const h = window.location.hash.replace(/^#/, '')
+        if (ids.has(h)) setLegalTab(h)
+        else if (!h) setLegalTab(null)
+      } catch {}
+    }
+    sync()
+    window.addEventListener('hashchange', sync)
+    return () => window.removeEventListener('hashchange', sync)
+  }, [])
+
   function create() {
     createCase(name.trim() || 'Untitled investigation')
     setName('')
@@ -36,8 +50,8 @@ export default function Home() {
           <div className="brand big">
             <span className="brand-mark" />
             <div>
-              <h1>Zero-Trace</h1>
-              <p>OSINT Workbench · local-only case files</p>
+              <h1>VeilTrace</h1>
+              <p>Private OSINT Workbench · local-only case files</p>
             </div>
           </div>
           <ThemeToggle />
@@ -100,7 +114,9 @@ export default function Home() {
           <LegalFooter onOpen={setLegalTab} />
         </footer>
       </div>
-      {legalTab && <LegalModal initialTab={legalTab} onClose={() => setLegalTab(null)} />}
+      {legalTab && (
+        <Suspense fallback={null}><LegalModal initialTab={legalTab} onClose={() => setLegalTab(null)} /></Suspense>
+      )}
     </div>
   )
 }

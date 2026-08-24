@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { useReactFlow } from '@xyflow/react'
 import { useCaseFile } from '../store/casefile'
 import { KINDS, normalizeValue, nodeIdOf } from '../utils/kinds'
@@ -8,13 +8,14 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { lazy, Suspense } from 'react'
 import CorrelationPanel from './CorrelationPanel'
-import Settings from './Settings'
-import ReportModal from './ReportModal'
-import TimelineModal from './TimelineModal'
 import ThemeToggle from './ThemeToggle'
 import LegalFooter from './LegalFooter'
-import LegalModal from './legal/LegalModal'
+const Settings = lazy(() => import('./Settings'))
+const ReportModal = lazy(() => import('./ReportModal'))
+const TimelineModal = lazy(() => import('./TimelineModal'))
+const LegalModal = lazy(() => import('./legal/LegalModal'))
 
 export default function Sidebar() {
   const caseName = useCaseFile((s) => s.caseName)
@@ -41,6 +42,20 @@ export default function Sidebar() {
   const [legalTab, setLegalTab] = useState(null)
   const { runDomainModule, runUsernameHunt, runModule } = useRunner()
 
+  useEffect(() => {
+    const ids = new Set(['privacy', 'terms', 'gdpr', 'ccpa', 'data', 'ip', 'tm'])
+    const sync = () => {
+      try {
+        const h = window.location.hash.replace(/^#/, '')
+        if (ids.has(h)) setLegalTab(h)
+        else if (!h) setLegalTab(null)
+      } catch {}
+    }
+    sync()
+    window.addEventListener('hashchange', sync)
+    return () => window.removeEventListener('hashchange', sync)
+  }, [])
+
   const selected = selectedNodeId ? nodes.find((n) => n.id === selectedNodeId) : null
   const pivotTarget = selected && ['domain', 'subdomain'].includes(selected.data.kind) && selected.data.label ? selected.data.label : null
 
@@ -53,12 +68,17 @@ export default function Sidebar() {
   }
 
   function handleExposure() {
-    const v = exposureValue.trim()
-    if (!v) { useCaseFile.getState().pushLog('Enter a value to check exposure', 'warn'); return }
+    const raw = exposureValue.trim()
+    if (!raw) { useCaseFile.getState().pushLog('Enter a value to check exposure', 'warn'); return }
     const kind = exposureKind
-    useCaseFile.getState().addFindings(null, [{ kind, value: v, source: 'Operator input', detail: 'Exposure check target — personal data, verify manually' }])
-    const nodeId = nodeIdOf(kind, v)
-    runModule('exposure', nodeId, v)
+    const normalized = normalizeValue(kind, raw) || raw.trim()
+    if (!normalized) { useCaseFile.getState().pushLog('Enter a valid value to check exposure', 'warn'); return }
+    if (kind === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
+      useCaseFile.getState().pushLog('Enter a valid email (e.g. you@example.com)', 'warn'); return
+    }
+    useCaseFile.getState().addFindings(null, [{ kind, value: normalized, source: 'Operator input', detail: 'Exposure check target — personal data, verify manually' }])
+    const nodeId = nodeIdOf(kind, normalized)
+    runModule('exposure', nodeId, normalized)
   }
 
   async function exportVault() {
@@ -67,12 +87,12 @@ export default function Sidebar() {
     if (pw.length < 8) { alert('Password must be at least 8 characters.'); return }
     try {
       const s = useCaseFile.getState()
-      const vault = await encryptToVault({ format: 'zero-trace-case', version: 1, caseName: s.caseName, nodes: s.nodes, edges: s.edges, aiNarrative: s.aiNarrative, exportedAt: new Date().toISOString() }, pw)
+      const vault = await encryptToVault({ format: 'veiltrace-case', version: 1, caseName: s.caseName, nodes: s.nodes, edges: s.edges, aiNarrative: s.aiNarrative, exportedAt: new Date().toISOString() }, pw)
       const blob = new Blob([JSON.stringify(vault, null, 2)], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `${(s.caseName || 'case').replace(/[^a-z0-9_-]+/gi, '_')}.ztvault.json`
+      a.download = `${(s.caseName || 'case').replace(/[^a-z0-9_-]+/gi, '_')}.vtvault.json`
       document.body.appendChild(a)
       a.click()
       a.remove()
@@ -86,11 +106,11 @@ export default function Sidebar() {
       <div className="flex flex-col gap-3 border-b p-4">
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
-            <span className="text-sm font-bold tracking-tight">ZT</span>
+            <span className="text-sm font-bold tracking-tight">VT</span>
           </div>
           <div className="flex-1">
-            <h1 className="text-sm font-semibold tracking-tight">Zero-Trace</h1>
-            <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">OSINT Workbench</p>
+            <h1 className="text-sm font-semibold tracking-tight">VeilTrace</h1>
+            <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Private Workbench</p>
           </div>
           <ThemeToggle />
         </div>
@@ -157,7 +177,7 @@ export default function Sidebar() {
                     <option value="name">Name</option>
                     <option value="image">Image hash</option>
                   </select>
-                  <Input value={exposureValue} placeholder={exposureKind === 'email' ? 'you@example.com' : exposureKind === 'phone' ? '+919876543210' : exposureKind === 'domain' ? 'example.com' : 'value'} onChange={(e) => setExposureValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleExposure()} className="h-8 flex-1" />
+                  <Input value={exposureValue} placeholder={exposureKind === 'email' ? 'you@example.com' : exposureKind === 'phone' ? '+919876543210' : exposureKind === 'domain' ? 'example.com' : exposureKind === 'image' ? 'sha256 hash…' : exposureKind === 'name' ? 'John Doe' : 'value'} onChange={(e) => setExposureValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleExposure()} className="h-8 flex-1" />
                 </div>
                 <Button size="sm" className="w-full h-7 bg-black text-white hover:bg-black/90 text-xs" onClick={handleExposure}>Check exposure →</Button>
                 <p className="text-[10px] leading-relaxed text-muted-foreground">Statuses: confirmed / possible / no result / intel / provider unavailable. Everything runs key-free: email + stealer logs (Hudson Rock), domain catalogs, phone intel &amp; pivots. No passwords ever shown.</p>
@@ -203,10 +223,18 @@ export default function Sidebar() {
         <LegalFooter onOpen={setLegalTab} />
       </div>
 
-      {settingsOpen && <Settings onClose={() => setSettingsOpen(false)} />}
-      {reportMode && <ReportModal initialMode={reportMode} onClose={() => setReportMode(null)} />}
-      {timelineOpen && <TimelineModal onClose={() => setTimelineOpen(false)} />}
-      {legalTab && <LegalModal initialTab={legalTab} onClose={() => setLegalTab(null)} />}
+      {settingsOpen && (
+        <Suspense fallback={null}><Settings onClose={() => setSettingsOpen(false)} /></Suspense>
+      )}
+      {reportMode && (
+        <Suspense fallback={null}><ReportModal initialMode={reportMode} onClose={() => setReportMode(null)} /></Suspense>
+      )}
+      {timelineOpen && (
+        <Suspense fallback={null}><TimelineModal onClose={() => setTimelineOpen(false)} /></Suspense>
+      )}
+      {legalTab && (
+        <Suspense fallback={null}><LegalModal initialTab={legalTab} onClose={() => setLegalTab(null)} /></Suspense>
+      )}
     </aside>
   )
 }

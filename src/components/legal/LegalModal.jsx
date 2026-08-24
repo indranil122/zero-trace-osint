@@ -35,14 +35,34 @@ function Section({ content }) {
 export default function LegalModal({ initialTab = 'privacy', onClose }) {
   const [tab, setTab] = useState(initialTab)
 
+  useEffect(() => setTab(initialTab), [initialTab])
+
+  useEffect(() => {
+    try {
+      const fromHash = window.location.hash.replace(/^#/, '')
+      if (fromHash && TABS.some((t) => t.id === fromHash)) setTab(fromHash)
+    } catch {}
+  }, [])
+
+  useEffect(() => {
+    try { if (tab) window.location.hash = tab } catch {}
+  }, [tab])
+
   useEffect(() => {
     const h = (e) => e.key === 'Escape' && onClose()
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
   }, [onClose])
 
+  function handleClose() {
+    try {
+      if (window.location.hash.replace(/^#/, '') === tab) history.replaceState(null, '', window.location.pathname + window.location.search)
+    } catch {}
+    onClose()
+  }
+
   return createPortal(
-    <div className="modal-backdrop" onClick={onClose}>
+    <div className="modal-backdrop" onClick={handleClose}>
       <div
         className="modal report max-w-[860px]"
         role="dialog"
@@ -52,7 +72,7 @@ export default function LegalModal({ initialTab = 'privacy', onClose }) {
       >
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-base font-semibold tracking-tight">Legal center</h2>
-          <button type="button" className="icon-close" onClick={onClose} aria-label="Close">×</button>
+          <button type="button" className="icon-close" onClick={handleClose} aria-label="Close">×</button>
         </div>
 
         <div className="flex flex-wrap gap-2">

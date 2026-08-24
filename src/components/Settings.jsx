@@ -2,10 +2,17 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { getStoredKey, setStoredKey } from '../api/ai'
 import { getStoredHibpKey, setStoredHibpKey } from '../api/exposure'
+import { hasLock, changeLock, clearLock, createLock } from '../utils/lock'
 
 export default function Settings({ onClose }) {
   const [key, setKey] = useState(getStoredKey())
   const [hibpKey, setHibpKey] = useState(getStoredHibpKey())
+  const [hasLocalLock, setHasLocalLock] = useState(() => hasLock())
+  const [curPw, setCurPw] = useState('')
+  const [newPw, setNewPw] = useState('')
+  const [confirmPw, setConfirmPw] = useState('')
+  const [lockMsg, setLockMsg] = useState('')
+  const [lockErr, setLockErr] = useState('')
   useEffect(() => {
     const h = (e) => e.key === 'Escape' && onClose()
     window.addEventListener('keydown', h)
@@ -72,6 +79,64 @@ export default function Settings({ onClose }) {
           >
             Remove keys
           </button>
+        </div>
+
+        <div style={{ height: 1, background: 'var(--hairline)', margin: '14px 0' }} />
+
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold tracking-tight">Local lock — browser only</h3>
+          <p className="dim">One-time gate for this browser. Stored as salted hash in localStorage (PBKDF2 250k). No server. Each browser has its own password. Share the one-time password internally if needed — it is not sent anywhere.</p>
+          {hasLocalLock ? (
+            <>
+              <label className="field">
+                <span>Current password</span>
+                <input type="password" value={curPw} onChange={(e) => setCurPw(e.target.value)} placeholder="••••••••" />
+              </label>
+              <label className="field">
+                <span>New password · min 8 chars</span>
+                <input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="••••••••" />
+              </label>
+              <label className="field">
+                <span>Confirm new password</span>
+                <input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} placeholder="••••••••" />
+              </label>
+              {lockErr && <p className="lock-error">{lockErr}</p>}
+              {lockMsg && <p className="dim" style={{ color: 'var(--ok)' }}>{lockMsg}</p>}
+              <div className="btn-row">
+                <button type="button" className="wide" onClick={async () => {
+                  setLockErr(''); setLockMsg('')
+                  if (newPw !== confirmPw) { setLockErr('Passwords do not match'); return }
+                  try { await changeLock(curPw, newPw); setLockMsg('Password changed — use it next unlock'); setCurPw(''); setNewPw(''); setConfirmPw('') } catch (e) { setLockErr(e.message) }
+                }}>Change password</button>
+                <button type="button" className="wide danger" onClick={() => {
+                  if (!window.confirm('Remove local lock? You will not be asked for a password on next launch. Cases remain.')) return
+                  clearLock(); setHasLocalLock(false); setLockMsg('Lock removed'); setLockErr(''); setCurPw(''); setNewPw(''); setConfirmPw('')
+                }}>Remove lock</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="dim">No lock is set on this browser. Set one now — it will be required on next launch.</p>
+              <label className="field">
+                <span>New password · min 8 chars</span>
+                <input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="••••••••" />
+              </label>
+              <label className="field">
+                <span>Confirm</span>
+                <input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} placeholder="••••••••" />
+              </label>
+              {lockErr && <p className="lock-error">{lockErr}</p>}
+              {lockMsg && <p className="dim" style={{ color: 'var(--ok)' }}>{lockMsg}</p>}
+              <div className="btn-row">
+                <button type="button" className="wide" onClick={async () => {
+                  setLockErr(''); setLockMsg('')
+                  if (newPw.length < 8) { setLockErr('Password must be at least 8 characters'); return }
+                  if (newPw !== confirmPw) { setLockErr('Passwords do not match'); return }
+                  try { await createLock(newPw); setHasLocalLock(true); setLockMsg('Lock created — will be required on next launch'); setNewPw(''); setConfirmPw('') } catch (e) { setLockErr(e.message) }
+                }}>Create lock</button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>,

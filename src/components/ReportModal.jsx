@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { marked } from 'marked'
 import { useCaseFile } from '../store/casefile'
-import { buildReport, printHtml } from '../engine/report'
+import { buildReport, buildAbuseReport, printHtml } from '../engine/report'
 import { aiExecutiveSummary, getStoredKey } from '../api/ai'
 
 export default function ReportModal({ initialMode = 'analyst', onClose }) {
@@ -20,10 +20,10 @@ export default function ReportModal({ initialMode = 'analyst', onClose }) {
     return () => window.removeEventListener('keydown', h)
   }, [onClose])
 
-  const markdown = useMemo(
-    () => buildReport({ caseName, nodes, edges, log, aiNarrative }, mode),
-    [caseName, nodes, edges, log, aiNarrative, mode]
-  )
+  const markdown = useMemo(() => {
+    if (mode === 'abuse') return buildAbuseReport({ caseName, nodes, edges })
+    return buildReport({ caseName, nodes, edges, log, aiNarrative }, mode)
+  }, [caseName, nodes, edges, log, aiNarrative, mode])
   const html = useMemo(() => marked.parse(markdown), [markdown])
 
   function download() {
@@ -31,7 +31,8 @@ export default function ReportModal({ initialMode = 'analyst', onClose }) {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${(caseName || 'case').replace(/[^a-z0-9_-]+/gi, '_')}${mode === 'ctf' ? '.writeup' : '.report'}.md`
+    const suffix = mode === 'ctf' ? '.writeup' : mode === 'abuse' ? '.abuse-report' : '.report'
+    a.download = `${(caseName || 'case').replace(/[^a-z0-9_-]+/gi, '_')}${suffix}.md`
     document.body.appendChild(a)
     a.click()
     a.remove()
@@ -86,6 +87,9 @@ export default function ReportModal({ initialMode = 'analyst', onClose }) {
             </button>
             <button type="button" className={mode === 'ctf' ? 'tab active' : 'tab'} onClick={() => setMode('ctf')}>
               CTF writeup
+            </button>
+            <button type="button" className={mode === 'abuse' ? 'tab active' : 'tab'} onClick={() => setMode('abuse')}>
+              Abuse report
             </button>
           </div>
           <button type="button" className="icon-close" onClick={onClose} aria-label="Close">×</button>

@@ -1,4 +1,4 @@
-# Roadmap — Zero-Trace Workbench
+# Roadmap — VeilTrace Workbench
 
 ## v1.0 (shipped)
 - Multi-case management: Home screen, create / open / delete / auto-switch, legacy-data migration

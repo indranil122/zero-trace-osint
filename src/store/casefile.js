@@ -468,11 +468,12 @@ export const useCaseFile = create((set, get) => ({
     get().scheduleSave()
   },
 
+  // also accepts legacy zero-trace-case on import
   exportJson() {
     const s = get()
     const payload = JSON.stringify(
       {
-        format: 'zero-trace-case',
+        format: 'veiltrace-case',
         version: 1,
         caseName: s.caseName,
         nodes: s.nodes,
@@ -487,7 +488,7 @@ export const useCaseFile = create((set, get) => ({
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${(s.caseName || 'case').replace(/[^a-z0-9_-]+/gi, '_')}.zerotrace.json`
+    a.download = `${(s.caseName || 'case').replace(/[^a-z0-9_-]+/gi, '_')}.veiltrace.json`
     document.body.appendChild(a)
     a.click()
     a.remove()
@@ -521,7 +522,7 @@ export const useCaseFile = create((set, get) => ({
     }
 
     if (!data || !Array.isArray(data.nodes)) {
-      alert('This does not look like a Zero-Trace case file.')
+      alert('This does not look like a VeilTrace case file.')
       return false
     }
 

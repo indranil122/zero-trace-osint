@@ -64,7 +64,7 @@ export function buildReport({ caseName, nodes, edges, log, aiNarrative }, mode =
   const title = isCtf ? `CTF Writeup — ${safeName}` : `OSINT Intelligence Report — ${safeName}`
   L.push(`# ${title}`)
   L.push('')
-  L.push(`_Generated ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC · Zero-Trace Workbench (local-only analysis)_`)
+  L.push(`_Generated ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC · VeilTrace Workbench (local-only analysis)_`)
   L.push('')
 
   if (aiNarrative && aiNarrative.trim()) {
@@ -178,6 +178,88 @@ export function buildReport({ caseName, nodes, edges, log, aiNarrative }, mode =
   L.push('---')
   L.push(`_${nodes.length} entities · produced offline in-browser. Verify all findings against primary sources before acting on them._`)
 
+  return L.join('\n')
+}
+
+export function buildAbuseReport({ caseName, nodes, edges: _edges }) {
+  const domains = nodes.filter((n) => n.data.kind === 'domain' || n.data.kind === 'subdomain')
+  const ips = nodes.filter((n) => n.data.kind === 'ip')
+  const emails = nodes.filter((n) => n.data.kind === 'email')
+  const L = []
+  L.push(`# Abuse Report — ${escMd(caseName || 'Untitled')}`)
+  L.push('')
+  L.push(`_Generated ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC · VeilTrace Workbench_`)
+  L.push('')
+  L.push('> **For authorized abuse reporting only.** Verify all indicators against primary sources before sending. Include your contact details before submitting to the abuse contact.')
+  L.push('')
+  if (!domains.length && !ips.length) {
+    L.push('_No domain/IP indicators in this case — add DNS/WHOIS findings first._')
+    L.push('')
+  }
+  if (domains.length) {
+    L.push('## Indicators — Domains')
+    L.push('')
+    for (const d of domains) {
+      const ev = (d.data.evidence || []).map((e) => `${e.source}: ${e.detail}`).slice(0, 3).join(' · ')
+      L.push(`- **${escMd(d.data.label)}**${ev ? ` — ${escMd(ev)}` : ''}`)
+    }
+    L.push('')
+  }
+  if (ips.length) {
+    L.push('## Indicators — IPs')
+    L.push('')
+    for (const ip of ips) {
+      const ev = (ip.data.evidence || []).map((e) => `${e.source}: ${e.detail}`).slice(0, 3).join(' · ')
+      L.push(`- **${escMd(ip.data.label)}**${ev ? ` — ${escMd(ev)}` : ''}`)
+    }
+    L.push('')
+  }
+  // RDAP abuse contacts if present in evidence
+  const rdapEmails = [...new Set(
+    nodes.flatMap((n) => (n.data.evidence || []).filter((e) => e.source && e.source.includes('RDAP')).flatMap(() => emails.map((em) => em.data.label)))
+  )]
+  if (rdapEmails.length || emails.length) {
+    L.push('## Contacts gathered (verify via RDAP)')
+    L.push('')
+    for (const em of emails.slice(0, 8)) {
+      L.push(`- ${escMd(em.data.label)}`)
+    }
+    if (!emails.length && rdapEmails.length) {
+      for (const em of rdapEmails.slice(0, 8)) L.push(`- ${escMd(em)}`)
+    }
+    L.push('')
+  }
+  L.push('## Recommended abuse contacts (lookup via RDAP)')
+  L.push('')
+  L.push('- Domain registrar abuse contact: `rdap.org/domain/<domain>` → `entities` with role `abuse` → `vcardArray` email')
+  L.push('- IP net abuse contact: `rdap.db.ripe.net` / `rdap.arin.net` for ASN')
+  L.push('')
+  L.push('## Draft email template')
+  L.push('')
+  L.push('```')
+  L.push(`Subject: Abuse report — ${caseName || 'OSINT findings'} — please investigate`)
+  L.push('')
+  L.push('Hello Abuse Team,')
+  L.push('')
+  L.push('I am reporting the following indicators observed during an authorized investigation. Please investigate per your AUP:')
+  if (domains.length) L.push(`Domains: ${domains.map((d) => d.data.label).join(', ')}`)
+  if (ips.length) L.push(`IPs: ${ips.map((i) => i.data.label).join(', ')}`)
+  L.push('')
+  L.push('Evidence (with timestamps and sources) is attached as Markdown/PDF from the case export. Key evidence:')
+  for (const n of [...domains, ...ips].slice(0, 6)) {
+    for (const ev of (n.data.evidence || []).slice(0, 2)) {
+      L.push(`- ${n.data.label}: ${ev.source} — ${ev.detail} @ ${fmtTime(ev.at)} ${ev.url ? `<${ev.url}>` : ''}`)
+    }
+  }
+  L.push('')
+  L.push('Reporter contact: [Your name, org, email, phone]')
+  L.push('Authorization: [Brief statement of authorization / CTF scope]')
+  L.push('')
+  L.push('Thank you,')
+  L.push('```')
+  L.push('')
+  L.push('---')
+  L.push('_Generated locally. Do not send without verifying indicators and adding your contact._')
   return L.join('\n')
 }
 

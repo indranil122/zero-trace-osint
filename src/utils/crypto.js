@@ -50,7 +50,7 @@ export async function encryptToVault(data, password) {
 }
 
 export async function decryptFromVault(vault, password) {
-  if (!vault || vault.format !== 'ztvault') throw new Error('Not a Zero-Trace vault file')
+  if (!vault || vault.format !== 'ztvault') throw new Error('Not a VeilTrace vault file')
   try {
     const key = await deriveKey(password, b64decode(vault.salt))
     const plain = await crypto.subtle.decrypt(

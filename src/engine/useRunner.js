@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import { useCaseFile } from '../store/casefile'
+import { normalizeValue } from '../utils/kinds'
 import { dnsScan } from '../api/dns'
 import { rdapScan } from '../api/rdap'
 import { crtshScan } from '../api/crtsh'
@@ -7,6 +8,7 @@ import { usernameScan } from '../api/username'
 import { exifScan } from '../api/exif'
 import { waybackScan } from '../api/wayback'
 import { exposureScan } from '../api/exposure'
+import { dorkScan } from '../api/dorks'
 
 export const MODULES = {
   dns: { label: 'DNS records', accepts: ['domain', 'subdomain'], scan: (t) => dnsScan(t) },
@@ -17,6 +19,11 @@ export const MODULES = {
     label: 'Exposure check',
     accepts: ['email', 'phone', 'username', 'domain', 'name', 'image'],
     scan: (t, kind = 'email') => exposureScan({ kind, value: t }),
+  },
+  dorks: {
+    label: 'Dork generator',
+    accepts: ['domain', 'subdomain', 'email', 'username', 'phone', 'name', 'ip'],
+    scan: (t, kind = 'domain') => dorkScan({ kind, value: t }),
   },
 }
 
@@ -44,10 +51,14 @@ export function useRunner() {
       const tid = addTask(mod.label)
       pushLog(`${mod.label}: scanning ${targetLabel}…`)
       try {
-        const findings =
-          moduleKey === 'exposure'
-            ? await exposureScan({ kind, value: targetLabel, file: kind === 'image' ? (imageFileByNode.get(parentNodeId) || parent?.data?.file) : undefined })
-            : await mod.scan(targetLabel)
+        let findings
+        if (moduleKey === 'exposure') {
+          findings = await exposureScan({ kind, value: targetLabel, file: kind === 'image' ? (imageFileByNode.get(parentNodeId) || parent?.data?.file) : undefined })
+        } else if (moduleKey === 'dorks') {
+          findings = await dorkScan({ kind, value: targetLabel })
+        } else {
+          findings = await mod.scan(targetLabel)
+        }
         useCaseFile.getState().addFindings(parentNodeId, findings)
         const linked = findings.filter((f) => f.kind !== '@').length
         const meta = findings.find((f) => f.meta?.status)

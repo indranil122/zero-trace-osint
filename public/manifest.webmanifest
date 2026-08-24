@@ -1,7 +1,7 @@
 {
-  "name": "Zero-Trace · OSINT Workbench",
-  "short_name": "Zero-Trace",
-  "description": "Browser-only OSINT recon workbench. No server, no logs — investigations stay on your machine.",
+  "name": "VeilTrace — Private OSINT Workbench",
+  "short_name": "VeilTrace",
+  "description": "Private OSINT workbench. No backend, no logs — investigations stay in the browser.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

@@ -11,17 +11,21 @@ export default function LegalFooter({ onOpen }) {
   return (
     <div className="flex flex-wrap items-center justify-center gap-1 text-xs">
       {links.map(([id, label]) => (
-        <button
+        <a
           key={id}
-          type="button"
-          onClick={() => onOpen(id)}
+          href={`#${id}`}
+          onClick={(e) => {
+            e.preventDefault()
+            try { window.location.hash = id } catch {}
+            onOpen(id)
+          }}
           className="rounded-full px-2 py-1 text-muted-foreground hover:bg-muted hover:text-foreground transition"
         >
           {label}
-        </button>
+        </a>
       ))}
       <span className="mx-1 text-muted-foreground/40">·</span>
-      <span className="text-muted-foreground">© 2026 Zero-Trace · MIT</span>
+      <span className="text-muted-foreground">© 2026 VeilTrace · MIT</span>
     </div>
   )
 }

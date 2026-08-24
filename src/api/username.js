@@ -63,6 +63,69 @@ const PLATFORMS = [
       return v && typeof v === 'object' ? Boolean(v.them) : null
     },
   },
+  {
+    name: 'HackerNews',
+    profile: (h) => `https://news.ycombinator.com/user?id=${h}`,
+    check: async (h) => {
+      const v = await getJson(`https://hacker-news.firebaseio.com/v0/user/${encodeURIComponent(h)}.json`)
+      return v && typeof v === 'object' && v.id ? true : v === null ? false : null
+    },
+  },
+  {
+    name: 'ProductHunt',
+    profile: (h) => `https://www.producthunt.com/@${h}`,
+    check: (h) => statusCheck(`https://www.producthunt.com/@${encodeURIComponent(h)}`),
+  },
+  {
+    name: 'Dev.to',
+    profile: (h) => `https://dev.to/${h}`,
+    check: (h) => statusCheck(`https://dev.to/api/users/by_username?url=${encodeURIComponent(h)}`),
+  },
+  {
+    name: 'Forem',
+    profile: (h) => `https://forem.com/${h}`,
+    check: (h) => statusCheck(`https://forem.com/api/users/by_username?url=${encodeURIComponent(h)}`),
+  },
+  {
+    name: 'Twitch',
+    profile: (h) => `https://www.twitch.tv/${h}`,
+    check: (h) => statusCheck(`https://www.twitch.tv/${encodeURIComponent(h)}`),
+  },
+  {
+    name: 'SoundCloud',
+    profile: (h) => `https://soundcloud.com/${h}`,
+    check: (h) => statusCheck(`https://soundcloud.com/${encodeURIComponent(h)}`),
+  },
+  {
+    name: 'Medium',
+    profile: (h) => `https://medium.com/@${h}`,
+    check: (h) => statusCheck(`https://medium.com/@${encodeURIComponent(h)}`),
+  },
+  {
+    name: 'Kaggle',
+    profile: (h) => `https://www.kaggle.com/${h}`,
+    check: (h) => statusCheck(`https://www.kaggle.com/${encodeURIComponent(h)}`),
+  },
+  {
+    name: 'PyPI',
+    profile: (h) => `https://pypi.org/user/${h}/`,
+    check: (h) => statusCheck(`https://pypi.org/user/${encodeURIComponent(h)}/`),
+  },
+  {
+    name: 'DockerHub',
+    profile: (h) => `https://hub.docker.com/u/${h}`,
+    check: (h) => statusCheck(`https://hub.docker.com/v2/users/${encodeURIComponent(h)}/`),
+  },
+  {
+    name: 'Replit',
+    profile: (h) => `https://replit.com/@${h}`,
+    check: (h) => statusCheck(`https://replit.com/@${encodeURIComponent(h)}`),
+  },
+  {
+    name: 'VK',
+    profile: (h) => `https://vk.com/${h}`,
+    check: (h) => statusCheck(`https://vk.com/${encodeURIComponent(h)}`),
+  },
 ]
 
 export async function usernameScan(rawHandle, onResult = () => {}) {

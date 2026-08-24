@@ -1,4 +1,5 @@
-const DB_NAME = 'zerotrace-workbench'
+const DB_NAME = 'veiltrace-workbench'
+const LEGACY_DB_NAME = 'zerotrace-workbench'
 const STORE_NAME = 'cases'
 const DB_VERSION = 1
 
@@ -38,7 +39,7 @@ export async function loadCase(id) {
 
 export async function loadAllCases() {
   const db = await openDb()
-  return new Promise((resolve, reject) => {
+  const primary = await new Promise((resolve, reject) => {
     const t = db.transaction(STORE_NAME, 'readonly')
     const store = t.objectStore(STORE_NAME)
     const keysReq = store.getAllKeys()
@@ -47,14 +48,43 @@ export async function loadAllCases() {
       const out = []
       for (let i = 0; i < keysReq.result.length; i++) {
         const rec = valsReq.result[i]
-        if (rec && typeof rec === 'object') {
-          out.push({ key: keysReq.result[i], record: rec })
-        }
+        if (rec && typeof rec === 'object') out.push({ key: keysReq.result[i], record: rec })
       }
       resolve(out)
     }
     t.onerror = () => reject(t.error)
   })
+  if (primary.length) return primary
+  // legacy migration: read from zerotrace-workbench if new store is empty
+  try {
+    const legacyReq = indexedDB.open(LEGACY_DB_NAME, DB_VERSION)
+    const legacyDb = await new Promise((res, rej) => {
+      legacyReq.onsuccess = () => res(legacyReq.result)
+      legacyReq.onerror = () => rej(legacyReq.error)
+      legacyReq.onupgradeneeded = () => res(legacyReq.result)
+    })
+    if (!legacyDb.objectStoreNames.contains(STORE_NAME)) return primary
+    const out = await new Promise((resolve, reject) => {
+      const t = legacyDb.transaction(STORE_NAME, 'readonly')
+      const store = t.objectStore(STORE_NAME)
+      const keysReq = store.getAllKeys()
+      const valsReq = store.getAll()
+      t.oncomplete = () => {
+        const arr = []
+        for (let i = 0; i < keysReq.result.length; i++) {
+          const rec = valsReq.result[i]
+          if (rec && typeof rec === 'object') arr.push({ key: keysReq.result[i], record: rec })
+        }
+        resolve(arr)
+      }
+      t.onerror = () => reject(t.error)
+    })
+    // copy legacy into new DB for next load
+    for (const { key, record } of out) {
+      try { await saveCase(key, record) } catch {}
+    }
+    return out.length ? out : primary
+  } catch { return primary }
 }
 
 export async function deleteStoredCase(id) {

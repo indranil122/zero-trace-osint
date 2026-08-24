@@ -1,4 +1,4 @@
-# Gap Analysis — Zero-Trace Workbench v0.x → v1.0
+# Gap Analysis — VeilTrace Workbench v0.x → v1.0 (legacy Zero-Trace)
 
 Audit date: 2026-08-22. Each issue is pinned to its location in the codebase, rated by severity, and tracked to resolution.
 

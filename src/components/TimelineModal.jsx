@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useCaseFile } from '../store/casefile'
 import { collectEvents } from '../engine/timeline'
@@ -11,27 +11,64 @@ function fmt(ts) {
 
 export default function TimelineModal({ onClose }) {
   const nodes = useCaseFile((s) => s.nodes)
+  const select = useCaseFile((s) => s.select)
   const events = useMemo(() => collectEvents(nodes), [nodes])
+  const [range, setRange] = useState(0) // 0 = all, else last N days
+  const [onlyMilestones, setOnlyMilestones] = useState(false)
+
+  const filtered = useMemo(() => {
+    let ev = events
+    if (onlyMilestones) ev = ev.filter((e) => e.type === 'milestone')
+    if (range > 0) {
+      const cutoff = Date.now() - range * 24 * 60 * 60 * 1000
+      ev = ev.filter((e) => e.at >= cutoff)
+    }
+    return ev
+  }, [events, range, onlyMilestones])
+
   useEffect(() => {
     const h = (e) => e.key === 'Escape' && onClose()
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
   }, [onClose])
 
+  function highlight(evs) {
+    const labels = new Set(evs.map((e) => e.nodeLabel))
+    const node = nodes.find((n) => labels.has(n.data.label))
+    if (node) select(node.id)
+  }
+
   return createPortal(
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal timeline" role="dialog" aria-modal="true" aria-label="Timeline" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
-          <h2>Timeline · {events.length} events</h2>
+          <h2>Timeline · {filtered.length}/{events.length} events</h2>
           <button type="button" className="icon-close" onClick={onClose} aria-label="Close">×</button>
         </div>
 
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', padding: '8px 0' }}>
+          <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12 }}>
+            <span>Range:</span>
+            <select value={range} onChange={(e) => setRange(Number(e.target.value))} style={{ width: 'auto', padding: '4px 6px' }}>
+              <option value={0}>All time</option>
+              <option value={7}>Last 7 days</option>
+              <option value={30}>Last 30 days</option>
+              <option value={365}>Last year</option>
+            </select>
+          </label>
+          <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12 }}>
+            <input type="checkbox" checked={onlyMilestones} onChange={(e) => setOnlyMilestones(e.target.checked)} />
+            Milestones only
+          </label>
+          <button type="button" style={{ marginLeft: 'auto', fontSize: 11, padding: '4px 8px' }} onClick={() => highlight(filtered)} disabled={!filtered.length}>Highlight on canvas →</button>
+        </div>
+
         <div className="report-body">
-          {!events.length && (
-            <p className="dim">No events yet — run some recon modules and their evidence will appear here chronologically.</p>
+          {!filtered.length && (
+            <p className="dim">{events.length ? 'No events in this range.' : 'No events yet — run some recon modules and their evidence will appear here chronologically.'}</p>
           )}
           <div className="tl-list">
-            {events.map((ev, i) => {
+            {filtered.map((ev, i) => {
               const t = fmt(ev.at)
               return (
                 <div key={`${ev.at}-${i}`} className={`tl-item ${ev.type}`}>

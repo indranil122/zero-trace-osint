@@ -58,8 +58,8 @@ export default function FlowCanvas() {
       useCaseFile.getState().pushLog('Drop an image file (jpg/png/webp…)', 'warn')
       return
     }
-    const node = addNode('image', position, { label: file.name })
-    runImageExif(node.id ?? node, file)
+    const nodeId = addNode('image', position, { label: file.name })
+    runImageExif(nodeId, file)
   }
 
   return (

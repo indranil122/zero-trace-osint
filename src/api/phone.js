@@ -117,8 +117,6 @@ export function buildPhonePivots(parsed) {
     { name: 'Bing dork', url: `https://www.bing.com/search?q=${encodeURIComponent(orQuery)}`, note: 'Second engine, different index' },
     { name: 'DuckDuckGo', url: `https://duckduckgo.com/?q=${encodeURIComponent(orQuery)}`, note: 'Privacy-friendly engine' },
     { name: 'Yandex', url: `https://yandex.com/search/?text=${encodeURIComponent(orQuery)}`, note: 'Strong on forums/social leaks' },
-    { name: 'Facebook', url: `https://www.facebook.com/search/top?q=${encodeURIComponent(e164)}`, note: 'Posts/accounts mentioning number' },
-    { name: 'X / Twitter', url: `https://x.com/search?q=${encodeURIComponent(`"${e164}" OR "${parsed.formatNational()}"`)}&f=live`, note: 'Live posts mentioning number' },
     { name: 'HIBP manual', url: 'https://haveibeenpwned.com/', note: 'Phone breach search needs a paid account — check manually' },
     { name: 'DeHashed', url: `https://dehashed.com/search?query=${encodeURIComponent(e164)}`, note: 'Leak search (account required)' },
   ]

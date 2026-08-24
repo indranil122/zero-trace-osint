@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { useCaseFile } from '../store/casefile'
 import { KINDS } from '../utils/kinds'
 import { useRunner, MODULES } from '../engine/useRunner'
+import { parsePhoneLocal, summarizeParsed, describeLineType, buildPhonePivots } from '../api/phone'
 
 function timeAgo(ts) {
   if (!ts) return ''
@@ -88,10 +89,10 @@ export default function Inspector() {
         />
       </label>
 
-      {(node.data.kind === 'domain' || node.data.kind === 'subdomain') && node.data.label && (
+      {node.data.label && Object.entries(MODULES).filter(([, mod]) => mod.accepts.includes(node.data.kind)).length > 0 && (
         <section className="pivot">
           <h3>Pivot from here</h3>
-          <div className="btn-row">
+          <div className="btn-row" style={{ flexWrap: 'wrap' }}>
             {Object.entries(MODULES)
               .filter(([, mod]) => mod.accepts.includes(node.data.kind))
               .map(([key, mod]) => (
@@ -100,48 +101,131 @@ export default function Inspector() {
                 </button>
               ))}
           </div>
+          {node.data.kind === 'email' && <p className="dim">Gravatar check → see Terminal → Next steps.</p>}
         </section>
       )}
 
+      {node.data.kind === 'phone' && (() => {
+        const parsed = parsePhoneLocal(node.data.label || '')
+        if (!parsed) return (
+          <section className="pivot">
+            <h3>Phone Intel</h3>
+            <p className="dim">Enter a valid international number (e.g. +919876543210) to see line type, formats and pivots. Run Exposure for full intel.</p>
+          </section>
+        )
+        const info = summarizeParsed(parsed)
+        const pivots = buildPhonePivots(parsed)
+        return (
+          <section className="pivot">
+            <h3>Phone Intel — offline parse</h3>
+            <div className="dns-meta" style={{ marginBottom: 8 }}>
+              <span className="dns-tag">{info.valid ? '✓ valid' : '✗ invalid'}</span>
+              <span className="dns-tag">{describeLineType(info.lineType).split(' —')[0]}</span>
+              <span className="dns-tag">+{info.countryCode} {info.country || ''}</span>
+            </div>
+            <div style={{ display: 'grid', gap: 6 }}>
+              {[
+                ['E.164', info.e164],
+                ['International', info.international],
+                ['National', info.national],
+                ['RFC3966', info.rfc3966],
+              ].map(([k, v]) => (
+                <div key={k} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 88 }}>{k}</span>
+                  <code style={{ fontSize: 11, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', background: 'var(--bg-soft)', padding: '4px 6px', borderRadius: 6 }}>{v}</code>
+                  <button type="button" style={{ fontSize: 11, padding: '2px 6px' }} onClick={async () => {
+                    try { await navigator.clipboard.writeText(v); useCaseFile.getState().pushLog(`Copied ${k}: ${v}`, 'ok') } catch {}
+                  }}>Copy</button>
+                </div>
+              ))}
+            </div>
+            <p className="dim" style={{ marginTop: 8 }}>{describeLineType(info.lineType)}</p>
+            <div className="dns-meta" style={{ marginTop: 8 }}>
+              {pivots.slice(0, 8).map((l) => (
+                <a key={l.name} className="dns-tag" href={l.url} target="_blank" rel="noreferrer" title={l.note} style={{ textDecoration: 'none' }}>{l.name} ↗</a>
+              ))}
+            </div>
+            <p className="dim">Full carrier/timezone → Run Exposure above. Pivots open in new tabs.</p>
+          </section>
+        )
+      })()}
+
       {node.data.kind === 'image' && (
-        <section className="pivot">
-          <h3>Local analysis</h3>
-          <div
-            className={`dropzone ${dragOver ? 'active' : ''}`}
-            onClick={() => fileRef.current?.click()}
-            onDragOver={(e) => {
-              e.preventDefault()
-              setDragOver(true)
-            }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={(e) => {
-              e.preventDefault()
-              setDragOver(false)
-              analyzeFile(e.dataTransfer.files?.[0])
-            }}
-          >
-            {dragOver ? 'Drop to analyze' : 'Drop an image here, or click to browse'}
-          </div>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            hidden
-            onChange={(e) => {
-              analyzeFile(e.target.files?.[0])
-              e.target.value = ''
-            }}
-          />
-          <p className="dim">Parsed in your browser with exifr — the file never leaves your machine.</p>
-        </section>
+        <>
+          <section className="pivot">
+            <h3>Local analysis</h3>
+            <div
+              className={`dropzone ${dragOver ? 'active' : ''}`}
+              onClick={() => fileRef.current?.click()}
+              onDragOver={(e) => {
+                e.preventDefault()
+                setDragOver(true)
+              }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault()
+                setDragOver(false)
+                analyzeFile(e.dataTransfer.files?.[0])
+              }}
+            >
+              {dragOver ? 'Drop to analyze' : 'Drop an image here, or click to browse'}
+            </div>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={(e) => {
+                analyzeFile(e.target.files?.[0])
+                e.target.value = ''
+              }}
+            />
+            <p className="dim">Parsed in your browser with exifr — the file never leaves your machine.</p>
+          </section>
+          <section className="pivot">
+            <h3>Reverse image — manual check</h3>
+            <p className="dim">Upload the same file manually to these engines (image never leaves your device until you choose to):</p>
+            <div className="dns-meta" style={{ marginTop: 8 }}>
+              <a className="dns-tag" href="https://lens.google.com/upload" target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>Google Lens ↗</a>
+              <a className="dns-tag" href="https://yandex.com/images/search?rpt=imageview" target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>Yandex ↗</a>
+              <a className="dns-tag" href="https://tineye.com/search" target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>TinEye ↗</a>
+              <a className="dns-tag" href="https://www.bing.com/images/search?view=detailv2&iss=sbi" target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>Bing Visual ↗</a>
+            </div>
+            {node.data.evidence?.some((e) => e.meta?.hash) && (
+              <p className="dim">SHA-256 hash also in Evidence → check on VirusTotal.</p>
+            )}
+          </section>
+        </>
       )}
 
       <div className="btn-row">
         <button type="button"
           className="wide"
-          onClick={() => {
-            navigator.clipboard?.writeText(node.data.label || '')
-            useCaseFile.getState().pushLog('Value copied to clipboard')
+          onClick={async () => {
+            const text = node.data.label || ''
+            try {
+              if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(text)
+                useCaseFile.getState().pushLog('Value copied to clipboard', 'ok')
+                return
+              }
+              throw new Error('Clipboard API unavailable')
+            } catch (e) {
+              try {
+                const ta = document.createElement('textarea')
+                ta.value = text
+                ta.style.position = 'fixed'
+                ta.style.opacity = '0'
+                document.body.appendChild(ta)
+                ta.select()
+                const ok = document.execCommand('copy')
+                ta.remove()
+                if (ok) useCaseFile.getState().pushLog('Value copied to clipboard', 'ok')
+                else throw e
+              } catch {
+                useCaseFile.getState().pushLog(`Copy failed — ${e.message}`, 'err')
+              }
+            }
           }}
         >
           Copy value

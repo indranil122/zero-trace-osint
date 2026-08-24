@@ -1,4 +1,4 @@
-const CACHE = 'zerotrace-v1'
+const CACHE = 'veiltrace-v1'
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon.svg']
 
 self.addEventListener('install', (event) => {

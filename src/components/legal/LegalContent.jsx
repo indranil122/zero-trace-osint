@@ -1,11 +1,15 @@
 export const privacyContent = {
   title: 'Privacy Policy',
-  updated: '23 August 2026',
-  intro: 'Zero-Trace is a browser-only workbench. There is no backend, no account database, and no server log of your investigations.',
+  updated: '24 August 2026',
+  intro: 'VeilTrace is a browser-only workbench. There is no backend, no account database, and no server log of investigations.',
   sections: [
     {
       h: '1. What we store',
-      p: 'Everything lives in this browser’s IndexedDB (zerotrace-workbench) and optional localStorage for theme + API keys. We never transmit case files, nodes, or log entries to any Zero-Trace server — because none exists. Export creates a JSON file on your device; Vault encrypts it locally with AES-256-GCM (PBKDF2 250k). You can delete all data via Clear site data.',
+      p: 'Everything lives in this browser’s IndexedDB (veiltrace-workbench, legacy zerotrace-workbench migrated automatically) and optional localStorage for theme + API keys + local lock hash (salted PBKDF2 250k). Case files, nodes, log entries, and the local password gate never leave the device. Export creates a JSON file on the device; Vault encrypts it locally with AES-256-GCM (PBKDF2 250k). Delete data via Clear site data.',
+    },
+    {
+      h: '1a. Local lock',
+      p: 'The start-up password is a browser-only gate. It is created once, shown once for internal sharing, and stored only as a salted hash in localStorage of this browser. Each browser has its own gate. Changing the password in Settings updates the hash locally. No server, no recovery. Resetting the gate does not delete cases.',
     },
     {
       h: '2. What leaves your device',
@@ -55,7 +59,7 @@ export const gdprContent = {
   sections: [
     {
       h: 'Scope',
-      p: 'Zero-Trace processes no personal data on a server. As a data controller, you process personal data locally in your browser when you enter it. This page explains how the tool supports your GDPR obligations.',
+      p: 'VeilTrace processes no personal data on a server. As a data controller, the operator processes personal data locally in the browser when it is entered. This page explains how the tool supports GDPR obligations.',
     },
     {
       h: 'Legal bases (Art. 6)',
