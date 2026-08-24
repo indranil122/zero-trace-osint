@@ -85,7 +85,7 @@ export default function Settings({ onClose }) {
 
         <div className="space-y-3">
           <h3 className="text-sm font-semibold tracking-tight">Local lock — browser only</h3>
-          <p className="dim">One-time gate for this browser. Stored as salted hash in localStorage (PBKDF2 250k). No server. Each browser has its own password. Share the one-time password internally if needed — it is not sent anywhere.</p>
+          <p className="dim"><strong>Local Lock protects access to the app in this browser. It does NOT encrypt case data.</strong> To encrypt the data itself, use Vault export (.vtvault.json, AES-256-GCM). Stored as salted PBKDF2 250k hash in localStorage — no server, no recovery.</p>
           {hasLocalLock ? (
             <>
               <label className="field">

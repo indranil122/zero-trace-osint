@@ -62,11 +62,16 @@ export default function CorrelationPanel() {
 
   function accept(s) {
     linkNodes(s.aId, s.bId, {
-      source: s.source === 'ai' ? 'AI correlation' : 'Correlation engine',
+      source: s.source === 'ai' ? 'AI suggestion — UNVERIFIED' : 'Correlation engine',
       detail: `[${s.confidence}] ${s.reason}`,
     })
     setSuggestions((prev) => prev.filter((x) => x !== s))
-    useCaseFile.getState().pushLog(`Linked: ${label(s.aId)} ⇄ ${label(s.bId)}`, 'ok')
+    useCaseFile.getState().pushLog(
+      s.source === 'ai'
+        ? `Linked as AI SUGGESTION (unverified): ${label(s.aId)} ⇄ ${label(s.bId)}`
+        : `Linked: ${label(s.aId)} ⇄ ${label(s.bId)}`,
+      s.source === 'ai' ? 'warn' : 'ok'
+    )
   }
 
   function acceptAll() {
@@ -80,6 +85,10 @@ export default function CorrelationPanel() {
         <button type="button" onClick={runRules}>Find links</button>
         <button type="button" onClick={runAi}>AI pass</button>
       </div>
+      <p className="dim" style={{ fontSize: 10.5, marginTop: 6 }}>
+        Rules produce deterministic links. AI results are <strong>suggestions, not facts</strong> — verify both endpoints before treating a link as real.
+        Confidence: High = exact/strong source · Medium = partial · Low = similarity or unverified.
+      </p>
       {suggestions.length > 1 && (
         <button type="button" className="wide" onClick={acceptAll}>
           Accept all ({suggestions.length})

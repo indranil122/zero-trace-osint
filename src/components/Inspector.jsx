@@ -3,6 +3,7 @@ import { useCaseFile } from '../store/casefile'
 import { KINDS } from '../utils/kinds'
 import { useRunner, MODULES } from '../engine/useRunner'
 import { parsePhoneLocal, summarizeParsed, describeLineType, buildPhonePivots } from '../api/phone'
+import { scoreExposureForNode, riskLevelColor } from '../engine/scoring'
 
 function timeAgo(ts) {
   if (!ts) return ''
@@ -18,8 +19,11 @@ function timeAgo(ts) {
 export default function Inspector() {
   const selectedNodeId = useCaseFile((s) => s.selectedNodeId)
   const node = useCaseFile((s) => s.nodes.find((n) => n.id === s.selectedNodeId))
+  const edge = useCaseFile((s) => s.edges.find((e) => e.id === s.selectedEdgeId))
+  const allNodes = useCaseFile((s) => s.nodes)
   const updateSelected = useCaseFile((s) => s.updateSelected)
   const deleteSelected = useCaseFile((s) => s.deleteSelected)
+  const clearEdge = useCaseFile((s) => s.selectEdge)
   const { runModule, runImageExif } = useRunner()
   const fileRef = useRef(null)
   const [dragOver, setDragOver] = useState(false)
@@ -31,19 +35,84 @@ export default function Inspector() {
       useCaseFile.getState().pushLog('That is not an image file', 'warn')
       return
     }
-    if (!node.data.label || node.data.label.endsWith('…')) {
+    if (!node?.data.label || node.data.label.endsWith('…')) {
       updateSelected({ label: file.name })
     }
     // Store file reference for exposure hash (local, not persisted to IDB as blob for now — keep name for reload)
     try { updateSelected({ fileName: file.name, fileSize: file.size }) } catch {}
-    runImageExif(node.id, file)
+    if (node) runImageExif(node.id, file)
+  }
+
+  if (edge && !node) {
+    const a = allNodes.find((n) => n.id === edge.source)
+    const b = allNodes.find((n) => n.id === edge.target)
+    const isCorr = Boolean(edge.data?.correlation)
+    const confMatch = String(edge.data?.reason || '').match(/\[(high|medium|low)\]/i)
+    const sharedSources = [...new Set(
+      ((a?.data.evidence || []).map((e) => e.source)).filter((s) => (b?.data.evidence || []).some((e) => e.source === s))
+    )].slice(0, 4)
+    return (
+      <aside className="inspector">
+        <div className="inspector-head">
+          <h2>Why are these connected?</h2>
+          <button type="button" className="danger" onClick={() => clearEdge(null)}>Close</button>
+        </div>
+        <div className="kind-row" style={{ '--node-accent': '#8b5cf6' }}>
+          <span className="entity-icon big">⇄</span>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, wordBreak: 'break-all' }}>{a?.data.label || edge.source}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{edge.label} →</div>
+            <div style={{ fontSize: 13, fontWeight: 600, wordBreak: 'break-all' }}>{b?.data.label || edge.target}</div>
+          </div>
+        </div>
+        <section className="pivot">
+          <h3>Reason</h3>
+          <p className="dim" style={{ marginTop: 4 }}>
+            {isCorr
+              ? (edge.data.reason || 'Correlation rule matched overlap between these entities.')
+              : `Direct scan relationship — created when "${a?.data.label}" was scanned and this ${edge.label} result was recorded.`}
+          </p>
+          {isCorr && (
+            <p className="dim" style={{ marginTop: 6, fontStyle: 'italic' }}>
+              ⚠ Correlation is a lead, not proof. Verify both endpoints against primary sources before treating as fact.
+            </p>
+          )}
+        </section>
+        {(confMatch || isCorr) && (
+          <div className="dns-meta">
+            <span className="dns-tag">Confidence: {confMatch ? confMatch[1].toLowerCase() : 'rule-based'}</span>
+            <span className="dns-tag">{isCorr ? 'Origin: correlation engine / AI suggestion' : 'Origin: module scan'}</span>
+          </div>
+        )}
+        {sharedSources.length > 0 && (
+          <section className="pivot">
+            <h3>Shared evidence sources</h3>
+            <div className="dns-meta" style={{ marginTop: 6 }}>
+              {sharedSources.map((s) => <span key={s} className="dns-tag">{s}</span>)}
+            </div>
+          </section>
+        )}
+        <section className="evidence">
+          <h3>Endpoint evidence</h3>
+          {[a, b].filter(Boolean).map((n) => (
+            <div key={n.id} className="ev-item">
+              <div className="ev-top"><strong>{n.data.kind}:{n.data.label}</strong><time>{n.data.evidence?.length || 0} items</time></div>
+              {(n.data.evidence || []).slice(-2).reverse().map((ev, i) => (
+                <p key={i} className="dim" style={{ fontSize: 11 }}>{ev.source}{ev.detail ? ` — ${String(ev.detail).slice(0, 90)}` : ''}</p>
+              ))}
+            </div>
+          ))}
+        </section>
+        <p className="dim" style={{ textAlign: 'center', fontSize: 11 }}>Click any node to switch back to node details.</p>
+      </aside>
+    )
   }
 
   if (!selectedNodeId || !node) {
     return (
       <aside className="inspector empty">
         <h2>Inspector</h2>
-        <p>Select a node on the canvas to view and edit its details.</p>
+        <p>Select a node on the canvas to view and edit its details. Click an edge to see why two things are connected.</p>
       </aside>
     )
   }
@@ -88,6 +157,35 @@ export default function Inspector() {
           onChange={(e) => updateSelected({ notes: e.target.value })}
         />
       </label>
+
+      {(() => {
+        const sc = scoreExposureForNode(node)
+        if (sc.score <= 0) return null
+        const c = riskLevelColor(sc.label)
+        return (
+          <div className="rounded-xl border p-3 flex items-center justify-between" style={{ borderColor: `${c}40`, background: `${c}0d` }}>
+            <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: c }}>Risk {sc.label} · {sc.score}/40</span>
+            <span className="text-xs text-muted-foreground">{sc.impacts.length} signals</span>
+          </div>
+        )
+      })()}
+
+      {node.data.kind === 'collection' && (
+        <section className="pivot">
+          <h3>Collection — {node.data.members?.length || 0} items</h3>
+          <p className="dim">Bucket for {node.data.bucketKind} to keep the canvas readable.</p>
+          <div style={{ maxHeight: 160, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8 }}>
+            {(node.data.members || []).slice(0, 20).map((m) => (
+              <code key={m} style={{ fontSize: 11, background: 'var(--bg-soft)', padding: '4px 6px', borderRadius: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m}</code>
+            ))}
+            {(node.data.members || []).length > 20 && <span className="dim">+{node.data.members.length - 20} more</span>}
+          </div>
+          <div className="btn-row">
+            <button type="button" onClick={() => useCaseFile.getState().expandCollection(node.id)}>Expand to nodes</button>
+            <button type="button" onClick={() => { navigator.clipboard?.writeText((node.data.members || []).join('\n')) }}>Copy list</button>
+          </div>
+        </section>
+      )}
 
       {node.data.label && Object.entries(MODULES).filter(([, mod]) => mod.accepts.includes(node.data.kind)).length > 0 && (
         <section className="pivot">
@@ -183,8 +281,8 @@ export default function Inspector() {
             <p className="dim">Parsed in your browser with exifr — the file never leaves your machine.</p>
           </section>
           <section className="pivot">
-            <h3>Reverse image — manual check</h3>
-            <p className="dim">Upload the same file manually to these engines (image never leaves your device until you choose to):</p>
+            <h3>Reverse image — manual shortcuts</h3>
+            <p className="dim">VeilTrace does not perform reverse search itself. These open external engines where you upload the image manually:</p>
             <div className="dns-meta" style={{ marginTop: 8 }}>
               <a className="dns-tag" href="https://lens.google.com/upload" target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>Google Lens ↗</a>
               <a className="dns-tag" href="https://yandex.com/images/search?rpt=imageview" target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>Yandex ↗</a>

@@ -67,25 +67,47 @@ export default function TimelineModal({ onClose }) {
           {!filtered.length && (
             <p className="dim">{events.length ? 'No events in this range.' : 'No events yet — run some recon modules and their evidence will appear here chronologically.'}</p>
           )}
-          <div className="tl-list">
-            {filtered.map((ev, i) => {
-              const t = fmt(ev.at)
-              return (
-                <div key={`${ev.at}-${i}`} className={`tl-item ${ev.type}`}>
-                  <div className="tl-when">
-                    <span className="tl-date">{t.date}</span>
-                    <span className="tl-time">{t.time}</span>
+          {(() => {
+            const byYear = new Map()
+            for (const ev of filtered) {
+              const y = new Date(ev.at).getUTCFullYear()
+              if (!byYear.has(y)) byYear.set(y, [])
+              byYear.get(y).push(ev)
+            }
+            return [...byYear.entries()]
+              .sort((a, b) => b[0] - a[0])
+              .map(([year, evs]) => (
+                <div key={year}>
+                  <div style={{
+                    position: 'sticky', top: 0, zIndex: 1,
+                    background: 'var(--bg-soft)', borderBottom: '1px solid var(--hairline)',
+                    padding: '5px 2px', margin: '8px 0 4px',
+                    fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', color: 'var(--text-dim)',
+                  }}>
+                    {year} · {evs.length} event{evs.length === 1 ? '' : 's'}
                   </div>
-                  <span className={`tl-dot ${ev.type}`} />
-                  <div className="tl-body">
-                    <div className="tl-label">{ev.label}</div>
-                    <div className="tl-node">on {ev.nodeLabel}</div>
-                    {ev.url && <a href={ev.url} target="_blank" rel="noreferrer">source ↗</a>}
+                  <div className="tl-list">
+                    {evs.map((ev, i) => {
+                      const t = fmt(ev.at)
+                      return (
+                        <div key={`${ev.at}-${i}`} className={`tl-item ${ev.type}`}>
+                          <div className="tl-when">
+                            <span className="tl-date">{t.date}</span>
+                            <span className="tl-time">{t.time}</span>
+                          </div>
+                          <span className={`tl-dot ${ev.type}`} />
+                          <div className="tl-body">
+                            <div className="tl-label">{ev.label}</div>
+                            <div className="tl-node">on {ev.nodeLabel}</div>
+                            {ev.url && <a href={ev.url} target="_blank" rel="noreferrer">source ↗</a>}
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
-              )
-            })}
-          </div>
+              ))
+          })()}
         </div>
       </div>
     </div>,

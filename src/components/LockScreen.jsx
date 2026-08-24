@@ -64,7 +64,7 @@ export default function LockScreen({ onUnlock }) {
               <code>{oneTimePw}</code>
               <button type="button" onClick={() => { navigator.clipboard?.writeText(oneTimePw); }}>Copy</button>
             </div>
-            <p className="dim" style={{ fontSize: 11 }}>Browser storage only. No server ever sees this. You can change it later in Settings → Local lock.</p>
+            <p className="dim" style={{ fontSize: 11, textAlign: 'center' }}>Local Lock guards app access only — case data is NOT encrypted at rest. Export an encrypted Vault (.vtvault.json) to protect the data itself. No server is involved in either.</p>
             <button type="button" className="lock-primary" onClick={onUnlock}>Continue to workbench →</button>
           </>
         ) : mode === 'setup' ? (

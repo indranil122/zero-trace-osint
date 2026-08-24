@@ -10,6 +10,13 @@ import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { lazy, Suspense } from 'react'
 import CorrelationPanel from './CorrelationPanel'
+import ScoreCard from './ScoreCard'
+import SnapshotPanel from './SnapshotPanel'
+import CoveragePanel from './CoveragePanel'
+import { extractEntities } from '../utils/extract'
+import { PLAYBOOKS, getCached, setCached, cacheKey } from '../engine/playbooks'
+import { gravatarProbe } from '../api/gravatar'
+import { dorkScan } from '../api/dorks'
 import ThemeToggle from './ThemeToggle'
 import LegalFooter from './LegalFooter'
 const Settings = lazy(() => import('./Settings'))
@@ -36,6 +43,8 @@ export default function Sidebar() {
   const [handleInput, setHandleInput] = useState('')
   const [exposureKind, setExposureKind] = useState('email')
   const [exposureValue, setExposureValue] = useState('')
+  const [bulkText, setBulkText] = useState('')
+  const [bulkPreview, setBulkPreview] = useState(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [reportMode, setReportMode] = useState(null)
   const [timelineOpen, setTimelineOpen] = useState(false)
@@ -79,6 +88,68 @@ export default function Sidebar() {
     useCaseFile.getState().addFindings(null, [{ kind, value: normalized, source: 'Operator input', detail: 'Exposure check target — personal data, verify manually' }])
     const nodeId = nodeIdOf(kind, normalized)
     runModule('exposure', nodeId, normalized)
+  }
+
+  function handleBulkExtract() {
+    const text = bulkText.trim()
+    if (!text) { useCaseFile.getState().pushLog('Paste text to extract', 'warn'); return }
+    const { emails, domains, ips, phones, usernames } = extractEntities(text)
+    const preview = { emails: emails.length, domains: domains.length, ips: ips.length, phones: phones.length, usernames: usernames.length }
+    setBulkPreview(preview)
+    const findings = []
+    emails.forEach((v) => findings.push({ kind: 'email', value: v, source: 'Bulk extract', detail: 'Extracted from paste' }))
+    domains.forEach((v) => findings.push({ kind: 'domain', value: v, source: 'Bulk extract', detail: 'Extracted from paste' }))
+    ips.forEach((v) => findings.push({ kind: 'ip', value: v, source: 'Bulk extract', detail: 'Extracted from paste' }))
+    phones.forEach((v) => findings.push({ kind: 'phone', value: v, source: 'Bulk extract', detail: 'Extracted from paste' }))
+    usernames.forEach((v) => findings.push({ kind: 'username', value: v, source: 'Bulk extract', detail: 'Extracted from paste' }))
+    if (!findings.length) { useCaseFile.getState().pushLog('No entities found in paste', 'warn'); return }
+    useCaseFile.getState().addFindings(null, findings)
+    useCaseFile.getState().pushLog(`Bulk extract: ${findings.length} entities (${Object.entries(preview).filter(([,c])=>c).map(([k,c])=>`${c} ${k}`).join(', ')})`, 'ok')
+  }
+
+  async function runPlaybook(id) {
+    const pb = PLAYBOOKS.find((p) => p.id === id)
+    if (!pb) return
+    const store = useCaseFile.getState()
+    const targetLabel = pb.accepts.includes(selected?.data.kind) && selected?.data.label ? selected.data.label : domainInput.trim() || handleInput.trim() || exposureValue.trim()
+    const targetKind = selected?.data.kind && pb.accepts.includes(selected.data.kind) ? selected.data.kind : (pb.accepts[0] || 'domain')
+    let targetId = selected && pb.accepts.includes(selected.data.kind) ? selected.id : null
+    if (!targetLabel) { store.pushLog(`Playbook ${pb.label}: pick a ${pb.accepts.join('/')} or select a node`, 'warn'); return }
+    // ensure the hub node exists so findings attach to it
+    if (!targetId) {
+      store.addFindings(null, [{ kind: targetKind, value: targetLabel, source: 'Operator input', detail: `${pb.label} target` }])
+      targetId = nodeIdOf(targetKind, targetLabel)
+    }
+    store.pushLog(`▶ ${pb.label} on ${targetLabel} — ${pb.steps.length} steps`, 'info')
+    for (const step of pb.steps) {
+      const key = cacheKey(step, targetLabel)
+      const cached = getCached(key)
+      if (cached) {
+        store.addFindings(targetId, cached)
+        store.pushLog(`  ↳ ${step} (cached)`, 'ok')
+        continue
+      }
+      if (step === 'dorks') {
+        const findings = dorkScan({ kind: targetKind, value: targetLabel })
+        setCached(key, step, findings)
+        store.addFindings(targetId, findings)
+        store.pushLog(`  ✓ ${step}`, 'ok')
+      } else {
+        const result = await runModule(step, targetId, targetLabel)
+        if (Array.isArray(result) && result.length) setCached(key, step, result)
+      }
+    }
+    if (pb.extra === 'gravatar' && targetKind === 'email') {
+      try {
+        const r = await gravatarProbe(targetLabel)
+        store.addFindings(targetId, [{ kind: '@', source: 'Gravatar', detail: r.found ? `Avatar exists (md5 ${r.hash.slice(0,10)}…)` : 'No Gravatar', url: r.profileUrl }])
+        store.pushLog(`  ✓ gravatar ${r.found ? 'found' : 'none'}`, r.found ? 'ok' : 'info')
+      } catch {}
+    }
+    if (pb.extra === 'hunt' && targetKind === 'username') {
+      await runUsernameHunt(targetLabel)
+    }
+    store.pushLog(`✓ Playbook ${pb.label} done`, 'ok')
   }
 
   async function exportVault() {
@@ -183,6 +254,46 @@ export default function Sidebar() {
                 <p className="text-[10px] leading-relaxed text-muted-foreground">Statuses: confirmed / possible / no result / intel / provider unavailable. Everything runs key-free: email + stealer logs (Hudson Rock), domain catalogs, phone intel &amp; pivots. No passwords ever shown.</p>
               </CardContent>
             </Card>
+            <Card>
+              <CardContent className="p-4 space-y-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Bulk extract — paste inbox</p>
+                <p className="text-[11px] leading-relaxed text-muted-foreground">Paste text, logs, or CSV. Extracts emails, domains, IPs, phones, @usernames locally.</p>
+                <textarea value={bulkText} onChange={(e) => setBulkText(e.target.value)} placeholder="Paste here — e.g. logs with alice@example.com, 1.1.1.1, +919876543210, @jdoe, example.com ..." rows={3} className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs" />
+                {bulkPreview && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {Object.entries(bulkPreview).filter(([,c])=>c).map(([k,c]) => (
+                      <span key={k} className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium">{c} {k}</span>
+                    ))}
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-1.5">
+                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { const e = extractEntities(bulkText); setBulkPreview({ emails:e.emails.length, domains:e.domains.length, ips:e.ips.length, phones:e.phones.length, usernames:e.usernames.length }) }}>Preview</Button>
+                  <Button size="sm" className="h-7 bg-black text-white hover:bg-black/90 text-xs" onClick={handleBulkExtract}>Extract & add →</Button>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 space-y-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Playbooks — one-click workflows</p>
+                <p className="text-[11px] leading-relaxed text-muted-foreground">Runs ordered steps with shared cache (6–60m) and skip-private-IP. Uses selected node or typed input.</p>
+                <div className="grid gap-1.5">
+                  {[
+                    { id:'domain-full', label:'Domain Full', desc:'DNS + WHOIS + Certs + Wayback' },
+                    { id:'email-full', label:'Email Full', desc:'Exposure + Gravatar + Dorks' },
+                    { id:'phone-full', label:'Phone Full', desc:'Exposure + Dorks' },
+                    { id:'username-full', label:'Username Full', desc:'Hunt 18 + Exposure + Dorks' },
+                  ].map((p) => (
+                    <button key={p.id} type="button" onClick={() => runPlaybook(p.id)} className="flex items-center justify-between rounded-xl border bg-card px-3 py-2 text-left hover:bg-muted transition">
+                      <span>
+                        <span className="block text-xs font-semibold">{p.label}</span>
+                        <span className="block text-[10px] text-muted-foreground">{p.desc}</span>
+                      </span>
+                      <span className="rounded-full bg-black px-2.5 py-1 text-[10px] font-bold text-white">▶</span>
+                    </button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="build" className="mt-0 space-y-4">
@@ -202,6 +313,9 @@ export default function Sidebar() {
           </TabsContent>
 
           <TabsContent value="intel" className="mt-0 space-y-4">
+            <ScoreCard />
+            <CoveragePanel />
+            <SnapshotPanel />
             <CorrelationPanel />
             <Button variant="outline" size="sm" className="w-full" onClick={() => setTimelineOpen(true)}>View Timeline →</Button>
           </TabsContent>

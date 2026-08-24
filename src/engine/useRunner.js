@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import { useCaseFile } from '../store/casefile'
-import { normalizeValue } from '../utils/kinds'
+import { normalizeValue, nodeIdOf } from '../utils/kinds'
 import { dnsScan } from '../api/dns'
 import { rdapScan } from '../api/rdap'
 import { crtshScan } from '../api/crtsh'
@@ -61,15 +61,29 @@ export function useRunner() {
         }
         useCaseFile.getState().addFindings(parentNodeId, findings)
         const linked = findings.filter((f) => f.kind !== '@').length
-        const meta = findings.find((f) => f.meta?.status)
-        if (meta) {
-          const status = meta.meta.status
-          const label = status === 'confirmed' ? 'exposure confirmed' : status === 'possible' ? 'possible match' : status === 'no_result' ? 'no exposure found' : status === 'intel' ? 'intel gathered' : 'provider unavailable'
-          pushLog(`${mod.label}: ${label} — ${meta.detail.slice(0, 80)}`, status === 'confirmed' ? 'warn' : status === 'provider_unavailable' ? 'warn' : 'ok')
+        if (moduleKey === 'exposure') {
+          // Aggregate honesty: never present partial coverage as a clean result
+          const statuses = findings.map((f) => f.meta?.status).filter(Boolean)
+          const uniq = {}
+          for (const s of statuses) uniq[s] = (uniq[s] || 0) + 1
+          const unavailable = uniq.provider_unavailable || 0
+          const confirmed = uniq.confirmed || 0
+          const summary = Object.entries(uniq).map(([k, v]) => `${v} ${k.replace(/_/g, ' ')}`).join(' · ')
+          pushLog(
+            `Exposure aggregate — ${summary}${unavailable ? ` — ⚠ ${unavailable} provider(s) unavailable: this is NOT a clean "no breach" result` : ''}`,
+            unavailable ? 'warn' : confirmed ? 'warn' : 'ok'
+          )
         } else {
-          pushLog(`${mod.label}: done — ${linked} linked finding(s)`, 'ok')
+          const meta = findings.find((f) => f.meta?.status)
+          if (meta) {
+            const status = meta.meta.status
+            const label = status === 'confirmed' ? 'exposure confirmed' : status === 'possible' ? 'possible match' : status === 'no_result' ? 'no exposure found' : status === 'intel' ? 'intel gathered' : 'provider unavailable'
+            pushLog(`${mod.label}: ${label} — ${meta.detail.slice(0, 80)}`, status === 'confirmed' ? 'warn' : status === 'provider_unavailable' ? 'warn' : 'ok')
+          } else {
+            pushLog(`${mod.label}: done — ${linked} linked finding(s)`, 'ok')
+          }
         }
-        return true
+        return findings
       } catch (e) {
         pushLog(`${mod.label} failed — ${e.message}`, 'err')
         return false
@@ -135,17 +149,40 @@ export function useRunner() {
         const results = await usernameScan(handle, (platform, state) => {
           if (state === true) pushLog(`  ✓ ${platform}: profile found`, 'ok')
           else if (state === false) pushLog(`  · ${platform}: not found`)
+          else if (state === 'blocked') pushLog(`  ⚠ ${platform}: blocked — inconclusive`, 'warn')
           else pushLog(`  ? ${platform}: inconclusive`, 'warn')
         })
-        const hits = results.filter((r) => r.found)
+        const store = useCaseFile.getState()
+        // Always record the hub + every probe result as negative/positive evidence
+        store.addFindings(null, [
+          { kind: 'username', value: handle, source: 'Operator input', detail: 'Hunt target' },
+        ])
+        const hubId = nodeIdOf('username', handle.toLowerCase())
+        const probeEvidence = results.map((r) => ({
+          kind: '@',
+          source: 'Profile probe',
+          detail:
+            r.found === true
+              ? `${r.platform} — profile found (${r.confidence} confidence) · ${r.reason}`
+              : r.found === false
+                ? `${r.platform} — no profile found`
+                : r.found === 'blocked'
+                  ? `${r.platform} — BLOCKED, inconclusive`
+                  : `${r.platform} — inconclusive`,
+          url: r.url,
+          meta: { platformProbe: true, platform: r.platform, handle: handle.toLowerCase(), found: r.found, method: r.method, confidence: r.confidence },
+        }))
+        store.addFindings(hubId, probeEvidence)
+        const hits = results.filter((r) => r.found === true)
         if (hits.length) {
-          const usernameId = `username:${handle.toLowerCase()}`
-          useCaseFile.getState().addFindings(null, [
-            { kind: 'username', value: handle, source: 'Operator input', detail: 'Search target' },
-          ])
-          useCaseFile.getState().addFindings(usernameId, hits)
+          store.addFindings(hubId, hits.map((r) => ({ ...r, source: 'Profile probe · open APIs' })))
         }
-        pushLog(`Username hunt done — ${hits.length} platform(s) hit`, hits.length ? 'ok' : 'info')
+        const notFound = results.filter((r) => r.found === false).length
+        const blocked = results.filter((r) => r.found === 'blocked').length
+        pushLog(
+          `Username hunt done — ${hits.length} confirmed · ${notFound} not-found · ${blocked} blocked / ${results.length - hits.length - notFound - blocked} inconclusive (all recorded as evidence)`,
+          hits.length ? 'ok' : 'info'
+        )
       } catch (e) {
         pushLog(`Username hunt failed — ${e.message}`, 'err')
       } finally {

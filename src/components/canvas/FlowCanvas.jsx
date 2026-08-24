@@ -74,7 +74,8 @@ export default function FlowCanvas() {
         onConnect={onConnect}
         onNodeDragStop={useCaseFile.getState().onNodeDragStop}
         onNodeClick={(_, n) => select(n.id)}
-        onPaneClick={() => { select(null); closeMenu() }}
+        onEdgeClick={(_, e) => { useCaseFile.getState().selectEdge(e.id); closeMenu() }}
+        onPaneClick={() => { select(null); useCaseFile.getState().selectEdge(null); closeMenu() }}
         onNodeContextMenu={(e, n) => {
           e.preventDefault()
           select(n.id)

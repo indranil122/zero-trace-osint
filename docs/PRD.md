@@ -1,8 +1,8 @@
 # VeilTrace Workbench — Product Requirements Document
 
-**Version:** 1.3  
-**Date:** 24 August 2026  
-**Status:** Active — implements shipped v1.0 – v1.3, plans v1.4 and v2  
+**Version:** 1.5  
+**Date:** 25 August 2026  
+**Status:** Active — implements shipped v1.0 – v1.5, plans v1.6 and v2  
 **Owner:** VeilTrace team  
 **License:** MIT  
 **Stack:** Vite + React 19 + @xyflow/react + Zustand + IndexedDB + Tailwind 4 + shadcn/ui — 100% browser-only, static `dist/` deploy  
@@ -41,7 +41,9 @@ The operator enters a domain, email, username, phone, name, or image. The app qu
 
 Core flow: **Discover → Correlate → Verify → Exposure → Pivot → Report**.
 
-Tagline: **The investigation stays on the device. The evidence stays verifiable.**
+Positioning: **a system for investigating, connecting, verifying, and documenting public information** — not a bundle of OSINT tools.
+
+Tagline: **The case file never reaches a VeilTrace server. External providers receive the queries you run — see §6 for exactly what leaves the device.**
 
 ---
 
@@ -147,13 +149,28 @@ scripts/     selftest.mjs
 
 ## 6. Privacy & Trust Model
 
-- **No backend.** `dist/` is static. No VeilTrace host receives queries, case files, or logs.
-- **Direct fetch.** Each module calls its public source from the browser tab. Traffic is visible in DevTools → Network.
-- **Local persistence.** `IndexedDB veiltrace-workbench` (legacy `zerotrace-workbench` auto-migrated), `localStorage` for theme, optional API keys (`zt-anthropic-key`, `zt-hibp-key`), and local lock hash (`veiltrace-lock-salt/hash`).
-- **Local lock.** One-time password gate on first start, shown once for internal sharing, stored only as salted PBKDF2 250k hash. Each browser has its own gate. Change or remove in Settings → Local lock. No server, no recovery.
+- **No VeilTrace backend.** `dist/` is static. No VeilTrace host receives queries, case files, or logs.
+- **External providers DO receive queries.** Every check contacts a third party under that provider's policies: an email exposure check sends the email; a DNS scan sends the domain; a phone live lookup sends the number; an AI pass sends entity labels to Anthropic. VeilTrace controls none of their logging.
+- **CORS proxies are availability fallbacks only** (crt.sh chain: browser → public proxy → source). Proxy operators can observe routed requests. Not part of the privacy model.
+- **Local persistence, plaintext at rest.** `IndexedDB veiltrace-workbench` stores cases unencrypted on disk. Local Lock gates the UI only. Vault export (`.vtvault.json`, AES-256-GCM) is the only at-rest encryption.
 - **Opt-in AI.** Claude is called only with a user-supplied key, only on summarized entity list (kind+label, max 150), never on raw evidence.
-- **No analytics, no cookies, no fingerprinting.**
-- **Verifiability.** Every finding stores `at, source, detail, url, meta` and is rendered in Inspector and Reports.
+- **No analytics, no cookies, no fingerprinting by VeilTrace.**
+- **Offline = local-only features.** Viewing saved cases/graph/reports, EXIF parse, offline phone parse. No scans work offline; external results are not cached beyond the case record.
+- **Verifiability over claims.** Every finding stores `at, source, detail, url, meta`; Coverage panel + reports state what was checked, what was unavailable, and what was checked-but-not-found.
+
+### 6.1 Known Privacy Gaps & Missing Safeguards (explicit)
+
+| # | Gap | Status |
+|---|---|---|
+| G1 | Query values are disclosed to external providers (email→breach DBs, phone→carrier API, domain→DoH/RDAP/CT, entity labels→Anthropic with key) | Inherent to architecture — documented in Transparency table |
+| G2 | Public CORS proxies observe crt.sh fallback traffic | Fallback-only; flagged in UI copy + Transparency |
+| G3 | Case data at rest is plaintext; Local Lock is UI-gating, not encryption | Documented in Lock screen + Settings + README warning #3 |
+| G4 | API keys stored unencrypted in localStorage | Documented; rotation advised on device compromise |
+| G5 | "No result" can reflect blocked providers, not safety | Mitigated: aggregate exposure logging marks partial results; Coverage panel shows unavailable sources; reports carry explicit incompleteness note |
+| G6 | Username probes on soft-404 sites can false-positive | Mitigated: per-platform method+confidence recorded; Low-confidence results labeled; negative evidence preserved |
+| G7 | AI correlation output can be mistaken for fact | Mitigated: edges stored as "AI suggestion — UNVERIFIED", warn-level logs, CorrelationPanel legend |
+| G8 | No per-provider request log export / no redaction tooling before report sharing | Missing — roadmap v1.6 candidate |
+| G9 | No relay worker yet: Sherlock-scale coverage and keyed HIBP remain impossible in-browser | Missing — relay is opt-in future work; would move queries off-device and must be re-evaluated against this section |
 
 ---
 
@@ -227,6 +244,29 @@ All findings attach as `breach` nodes or `@` evidence with `meta.status/confiden
 - `IndexedDB veiltrace-workbench` auto-save 350ms debounce, multiple cases, last-active remembered `localStorage zt-last-active`, legacy DB auto-migrated.
 - Export `.veiltrace.json` (imports legacy `.zerotrace.json`), Vault `.vtvault.json` (AES-256-GCM, PBKDF2 250k, random salt/IV, `format ztvault`).
 - Import always creates new case. Delete requires confirmation.
+
+### 7.10 Exposure Scoring `src/engine/scoring.js` + `src/components/ScoreCard.jsx`
+
+- Per-node `confirmed 22 / possible 10 / intel 2` base, weighted by severity (`high 1.0 / medium 0.6 / low 0.3`), confidence (`high 1.0 / medium 0.85 / low 0.65`), provider (`Hudson 1.25 / HIBP 1.1 / XON 1.0`), capped at 40 per node.
+- Overall `score = 100 * (1 - exp(-total/45)) + min(12, breachCount*2)` capped at 100, bands `critical≥35 / high≥22 / medium≥10 / low>0 / none`. Color `critical #ef4444 / high #f59e0b / medium #eab308 / low #22c55e`. Shown in Intel ScoreCard, Inspector risk badge, and Report `## Risk Score`.
+
+### 7.11 Collection Nodes (kipi style) `src/store/casefile.js:344` + `src/utils/kinds.js:9`
+
+- Threshold `20` of same kind (`subdomain`, `account`) from a single parent collapses into one `collection` node `collection:parent:kind` with `label: "42 subdomains"`, `members: [...]`, single edge `has-collection`. Existing bucket merges members.
+- Inspector shows first 20 members with Copy and `Expand to nodes` which removes collection and re-adds individual findings via `expandCollection`.
+
+### 7.12 Bulk Extract (Paste Inbox) `src/utils/extract.js` + `src/components/Sidebar.jsx:171`
+
+- Local regex extract from pasted text: emails, domains (excl. email domains), IPv4, phones, @usernames. Preview counts, then `addFindings(null, findings)` with source `Bulk extract`. No network.
+
+### 7.13 Playbooks `src/engine/playbooks.js` + `src/components/Sidebar.jsx:171`
+
+- Registry `PLAYBOOKS = [domain-full (dns+rdap+certs+wayback), email-full (exposure+dorks+gravatar), phone-full, username-full]`. Steps run sequentially on selected node or typed input via `useRunner`.
+- Shared cache `CACHE` with TTL per module (`dns 6m / rdap 60m / certs 30m / wayback 30m / exposure 6m / dorks 60m`) via `cacheKey` and `getCached/setCached`. Cached hits replay without network.
+
+### 7.14 Snapshots & Diff `src/store/casefile.js:132` + `src/components/SnapshotPanel.jsx`
+
+- `snapshots: []` per case, persisted in `IndexedDB`. `createSnapshot(name)` deep-copies `nodes/edges` with `at`. `restoreSnapshot` snapshots current then restores. `deleteSnapshot`. `diffSnapshots(a,b)` computes `added/removed` nodes and edges by id. Intel panel shows list (reverse), Restore/Delete, and A↔B diff with `+added / -removed / edges` preview. Included in `.veiltrace.json` export.
 
 ---
 
@@ -313,10 +353,21 @@ All findings attach as `breach` nodes or `@` evidence with `meta.status/confiden
 
 ## 13. Success Metrics
 
-- Deterministic correlator links shared infra correctly with no duplicate suggestions (covered by `scripts/selftest.mjs` 34 checks).
-- Report reduces writeup time from ~30 min to <5 min.
+Technical (covered by CI/self-tests):
+
+- Deterministic correlator links shared infra with zero duplicate suggestions (`scripts/selftest.mjs` — 34 checks).
 - Entire stack runs on free-tier hosting and key-free providers by default.
 - Mobile drawers/dock/sheet pass manual sweep at 320, 375, 414, 768, 1024, 1440 widths in both themes.
+
+Outcome metrics (what actually tells us the product works — tracked manually per investigation session):
+
+- Time-to-first-useful-result (< 60s from paste/typing for a domain target)
+- Time-to-report (< 5 min for a single-domain case; was ~30 min manually)
+- False-positive rate on Low-confidence username hits vs confirmed accounts
+- Provider success rate per session (Coverage panel: checked vs unavailable) — target ≥ 80% availability
+- % of accepted correlation edges that the operator later verified as correct
+- % of report readers who needed no follow-up questions about why entities were linked (explainability proxy: edge-inspector open rate vs support questions)
+- Negative-evidence recall: platforms recorded as not-found per hunt (target = 100% of probed platforms, since absence is evidence)
 
 ---
 
@@ -334,7 +385,7 @@ QuickSearch, edge labels, undo/redo 50, context menu, PNG export, premium light 
 
 Exposure suite (XON + Hudson + HIBP catalog + phone intel), dork-adjacent phone pivots, intel status chips.
 
-### v1.3 Shipped (current)
+### v1.3 Shipped
 
 - Phone Intel chips in Inspector (offline + live)
 - Reverse image manual links
@@ -348,10 +399,31 @@ Exposure suite (XON + Hudson + HIBP catalog + phone intel), dork-adjacent phone 
 - Code-split heavy modals, Vite chunk 850 limit
 - Rebrand to VeilTrace with legacy data migration
 
-### v1.4 Planned
+### v1.4 Shipped
 
-- Relay opt-in for Sherlock-scale and CORS-free ct.sh / HIBP keyed calls
-- Additional username sources via relay
+- Exposure scoring 0-100 + RiskProfile bands and colors (`src/engine/scoring.js`, ScoreCard, Inspector risk badge, Report Risk Score)
+- Collection nodes — 20+ bucketing for subdomains/accounts, expandable in Inspector (`src/store/casefile.js:344`)
+- Bulk extract paste inbox — local regex for emails/domains/IPs/phones/usernames (`src/utils/extract.js`)
+- Playbooks with shared cache (domain/email/phone/username full, TTL 6-60m) (`src/engine/playbooks.js`)
+- Snapshots & diff — point-in-time saves, restore, added/removed preview (`SnapshotPanel.jsx`), persisted and exported
+- Report Risk Score section
+
+### v1.5 Shipped (current) — Trust & Explainability
+
+- **Investigation Coverage** panel + report section — exactly what was checked / not run / unavailable / manual-only, per module and per exposure provider; username platforms as `found · not-found · inconclusive of 18` (`src/engine/coverage.js`, `CoveragePanel.jsx`)
+- **Negative evidence** — every platform probe is recorded on the username hub (found/not-found/blocked/inconclusive with method+confidence); reports list "checked and produced no matching result" per handle
+- **Username verification reasons** — each result carries method (api-json/api-status/html-status), confidence tier, and a human reason; Low-confidence soft-404 sites labeled explicitly
+- **Explainable edges** — click any edge → Inspector shows both endpoints, edge label meaning, reason (rule text or scan origin), confidence, origin (module/correlation/AI), shared evidence sources (`Inspector.jsx` edge mode)
+- **AI = suggestions only** — accepted AI links stored as "AI suggestion — UNVERIFIED" with warn-level logs and CorrelationPanel legend separating rules from suggestions
+- **Exposure aggregate honesty** — run log summarizes all provider statuses and explicitly flags when unavailable providers make the result incomplete ("NOT a clean no-breach result")
+- **Timeline as history** — sticky year grouping with per-year event counts
+- **Honest warnings** — README ⚠ section (10 gaps), PRD §6.1 gap register G1-G9, Lock≠Vault copy in Lock screen + Settings, reverse-image renamed to manual shortcuts, Home footer states that providers receive queries
+- PRD success metrics expanded with outcome measures (time-to-result, false-positive rate, availability %, explainability)
+
+### v1.6 Planned
+
+- Relay opt-in for Sherlock-scale and CORS-free crt.sh / HIBP keyed calls (re-evaluate §6.1 G2/G9 impact first)
+- Per-provider request-log export + pre-share redaction pass for reports
 - GitHub commit-email enrichment
 
 ### v2 Vision
@@ -424,6 +496,8 @@ Contributions keep VeilTrace private, verifiable, and fast.
 
 ## 19. Changelog
 
+- **1.5 (2026-08-25):** Trust & explainability — Investigation Coverage panel + report section, negative evidence recording, username method/confidence/reasons, clickable edge explanations, AI-as-suggestion labeling, exposure aggregate honesty, timeline year grouping, honest privacy-gap warnings (README ⚠ + PRD §6.1), Lock≠Vault copy.
+- **1.4 (2026-08-25):** Exposure scoring 0-100, collection bucketing (kipi), bulk extract, playbooks with shared cache, snapshots & diff, risk in reports, ScoreCard.
 - **1.3 (2026-08-24):** Mobile shell, phone chips, reverse image, 18 username platforms, dork module, timeline filters, abuse report, local lock (one-time gate), localhost legal pages, VeilTrace rebrand with legacy migration, lazy modals.
 - **1.2:** Exposure suite + phone intel.
 - **1.1:** Search, labels, undo/redo, context menu, PNG export, redesign.

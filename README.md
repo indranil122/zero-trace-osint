@@ -13,6 +13,25 @@
 
 ---
 
+## ⚠️ HONEST WARNINGS — READ BEFORE TRUSTING VEILTRACE
+
+VeilTrace is private **from VeilTrace** (there is no VeilTrace server). It is **not anonymous**, **not encrypted by default**, and **not a guarantee of any kind**. These are real gaps, not marketing fine print:
+
+1. **Your queries leave your device.** Checking an email sends that email to XposedOrNot / Hudson Rock / HIBP. A DNS scan sends the domain to Google/Cloudflare. A phone lookup sends the number to phone-number-api.com. With an AI key set, entity labels go to Anthropic. Those providers see what you investigate and operate under their own logging/privacy policies — which VeilTrace does not control.
+2. **CORS proxies can see your requests.** When crt.sh is blocked, requests route through third-party public proxies (`corsproxy.io`, allorigins, corsfix, yacdn). The chain becomes *you → proxy → crt.sh*. Proxies are an availability fallback only — they are NOT part of the privacy model.
+3. **Local Lock ≠ encryption.** The start-up password gates the UI in that browser only. Case data in IndexedDB is plaintext on disk. Only a Vault export (`.vtvault.json`) encrypts data (AES-256-GCM).
+4. **"No result" ≠ safe.** If providers are blocked or rate-limited, a missing breach record may mean "couldn't check", not "not breached". Coverage panel and logs flag unavailable sources; reports list them explicitly.
+5. **Username results can be false positives.** Low-confidence platforms return HTTP 200 for missing accounts (SPAs, soft-404s). Every probe records its method + confidence; treat Low as a lead, never as fact.
+6. **Correlations and AI links are leads, not proof.** Rules encode heuristics (shared IP, handle match). AI output is labeled "suggestion — unverified". Nothing in VeilTrace confirms identity.
+7. **Keys sit in localStorage.** Anthropic/HIBP keys are stored unencrypted in the browser. A compromised device/profile exposes them. Rotate if in doubt.
+8. **Offline means local-only.** Offline you can view cases, graph, reports, EXIF, offline phone parse. You cannot scan anything. No offline cache of external results beyond what was already saved in the case.
+9. **Dependency risk is structural.** No backend also means no control: any provider can change API/CORS/rate limits and break a module. crt.sh already needs 5-route fallbacks.
+10. **Not legal advice, not OPSEC.** Public information ≠ permission to investigate. VeilTrace does not hide *you* from the sites you query; use appropriate infrastructure for your threat model.
+
+If any of these matter for your use case, resolve them before relying on VeilTrace.
+
+---
+
 ### What VeilTrace Does
 
 VeilTrace is a local-first workbench for OSINT recon. Enter a domain, email, username, phone, name, or image. The app queries public sources directly from the browser, renders every finding as a node on an interactive graph, and lets the operator pivot, correlate, verify, and export.
@@ -72,7 +91,9 @@ All exposure checks run key-free in the browser except the optional HIBP and Ant
 
 ### Transparency — Data Sources
 
-All network calls originate from the browser tab. No proxy is inserted by VeilTrace. Closing the tab stops all traffic.
+**VeilTrace sends nothing to VeilTrace (no such server exists). External providers DO receive the queries required to run each check.** Examples: an email exposure check sends that email to the breach provider; a phone lookup sends the number to the carrier-lookup API; an AI pass sends entity labels to Anthropic. Each row below states exactly what leaves the browser.
+
+All network calls originate from the browser tab. Closing the tab stops all traffic. crt.sh fallback proxies are availability workarounds, not privacy features — treat proxy-routed requests as visible to the proxy operator.
 
 | Module | Provider & Endpoint | Data Sent | Key | CORS | Rate Limit | Notes |
 |---|---|---|---|---|---|---|
@@ -95,7 +116,7 @@ All network calls originate from the browser tab. No proxy is inserted by VeilTr
 | **Optional HIBP fallback** | `https://haveibeenpwned.com/api/v3/breachedaccount/{email}` | Email | Yes — HIBP key (`zt-hibp-key`) | No (keyed endpoint blocks browsers by design → shows provider unavailable) | HIBP policy | Not a parallel provider; XposedOrNot remains primary |
 | **Local lock** | `localStorage veiltrace-lock-salt/hash` (PBKDF2 250k, local only) | Password hash only | None | N/A | N/A | One-time browser gate, shown once for internal sharing. Change in Settings |
 
-No analytics, no telemetry, no cookies. Keys live only in `localStorage`. Clearing site data removes everything.
+No analytics, no telemetry, no cookies. Keys live only in `localStorage` (unencrypted — see warning #7). Clearing site data removes everything.
 
 ---
 
@@ -203,10 +224,14 @@ PWA: install to desktop, view saved cases offline.
 
 ### Limits
 
-- Username hunt: 18 platforms in-browser. Full Sherlock-scale requires a relay worker
-- Exposure: HIBP keyed `breachedaccount` and username catalog remain proxy-only by provider policy — shown as provider unavailable, never faked
+- Username hunt: 18 platforms in-browser. Full Sherlock-scale requires a relay worker. Platform results carry method + confidence (High = API that 404s on absence; Low = HTML probe on soft-404 sites) — see Coverage panel legend
+- Exposure: HIBP keyed `breachedaccount` and username catalog remain proxy-only by provider policy — shown as provider unavailable, never faked. Unavailable providers make the result INCOMPLETE, not clean
+- Negative evidence is recorded: platforms checked with no account found are kept per-handle and listed in reports ("checked and produced no matching result")
+- Investigation Coverage panel (Intel tab) shows exactly what was run, what wasn't, and what was blocked
+- Every graph edge is clickable — Inspector explains why two entities are connected, its origin (module scan vs correlation vs AI suggestion), and shared evidence sources. AI links are stored as "AI suggestion — UNVERIFIED"
 - PDF via browser Print dialog. PNG graph export is included
-- crt.sh may need a retry; fallback routes and clear messaging are included. Use DNS or Wayback as alternates for subdomains
+- crt.sh may need a retry; fallback routes (third-party proxies) and clear messaging are included. Use DNS or Wayback as alternates for subdomains
+- Phone live carrier data is context intel, not identity proof; Truecaller/Sync.me/WhatsApp links are investigation pivots you choose to open
 - Phone live carrier: 5/min free tier. Offline parse always works
 
 ---

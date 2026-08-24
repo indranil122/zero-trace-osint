@@ -110,7 +110,7 @@ export default function Home() {
         </div>
 
         <footer className="privacy-note center space-y-3">
-          <p>Zero server, zero accounts, zero logs. Recon queries go from this tab straight to public sources.</p>
+          <p>Zero server, zero accounts, zero VeilTrace logs. External providers (DNS, breach databases, APIs) receive the queries you run — see the Transparency table in the project README. Investigate only what you are authorized to investigate.</p>
           <LegalFooter onOpen={setLegalTab} />
         </footer>
       </div>

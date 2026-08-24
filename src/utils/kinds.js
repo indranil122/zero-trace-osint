@@ -7,6 +7,8 @@ export const KINDS = {
   username: { label: 'Username', icon: '👤', color: '#fcd34d' },
   account: { label: 'Account', icon: '🔗', color: '#fb923c' },
   breach: { label: 'Breach', icon: '🔓', color: '#f43f5e' },
+  risk: { label: 'Risk Profile', icon: '🛡️', color: '#f59e0b' },
+  collection: { label: 'Collection', icon: '📦', color: '#a1a1aa' },
   name: { label: 'Name', icon: '🧑', color: '#a3e635' },
   location: { label: 'Location', icon: '📍', color: '#e879f9' },
   phone: { label: 'Phone', icon: '📞', color: '#d8b4fe' },
@@ -33,7 +35,7 @@ export function normalizeValue(kind, raw) {
     v = v.toLowerCase()
   } else if (kind === 'username' || kind === 'account') {
     v = v.replace(/^@+/, '').toLowerCase()
-  } else if (kind === 'breach') {
+  } else if (kind === 'breach' || kind === 'risk' || kind === 'collection') {
     v = v.trim()
   } else if (kind === 'name') {
     v = v.trim()
@@ -53,11 +55,15 @@ const EDGE_LABELS = {
   'domain>nameserver': 'delegates-to',
   'domain>email': 'registrant-contact',
   'domain>breach': 'exposed-in',
+  'domain>risk': 'has-risk',
+  'domain>collection': 'has-collection',
   'subdomain>ip': 'resolves-to',
   'subdomain>subdomain': 'has-subdomain',
   'subdomain>nameserver': 'delegates-to',
+  'subdomain>collection': 'has-collection',
   'username>account': 'found-on',
   'username>breach': 'exposed-in',
+  'username>collection': 'has-collection',
   'account>username': 'handle-of',
   'email>domain': 'hosted-at',
   'email>breach': 'exposed-in',
@@ -66,6 +72,9 @@ const EDGE_LABELS = {
   'name>breach': 'exposed-in',
   'breach>email': 'affects',
   'breach>domain': 'affects',
+  'ip>risk': 'has-risk',
+  'collection>subdomain': 'contains',
+  'collection>account': 'contains',
 }
 
 export function edgeLabelFor(parentKind, childKind) {

@@ -8,6 +8,7 @@ import { md5 } from '../src/utils/md5.js'
 import { parseCdx } from '../src/api/wayback.js'
 import { nextMoves } from '../src/engine/nextmoves.js'
 import { collectEvents } from '../src/engine/timeline.js'
+import { computeCoverage } from '../src/engine/coverage.js'
 
 let passed = 0
 function check(name, fn) {
@@ -313,6 +314,43 @@ console.log('\n[10] encrypted vault roundtrip')
   check('exposure handles any phone string gracefully', () => {
     assert.ok(Array.isArray(domainFindings) && domainFindings.length > 0)
   })
+
+  console.log('\n[11] investigation coverage + negative evidence')
+  {
+    const covNodes = [
+      node('domain', 'example.com', [ev('DNS-over-HTTPS', 'A ×1')]),
+      node('username', 'jdoe', [
+        { at: Date.now(), source: 'Profile probe', detail: 'GitHub — profile found', meta: { platformProbe: true, platform: 'github', handle: 'jdoe', found: true, confidence: 'high' } },
+        { at: Date.now(), source: 'Profile probe', detail: 'Reddit — no profile found', meta: { platformProbe: true, platform: 'reddit', handle: 'jdoe', found: false } },
+        { at: Date.now(), source: 'Profile probe', detail: 'Twitch — blocked', meta: { platformProbe: true, platform: 'twitch', handle: 'jdoe', found: 'blocked' } },
+      ]),
+      node('email', 'x@y.com', [{ at: Date.now(), source: 'Exposure · XposedOrNot', detail: '', meta: { status: 'provider_unavailable' } }]),
+    ]
+    const cov = computeCoverage(covNodes)
+    const row = (id) => cov.rows.find((r) => r.id === id)
+    check('dns counted checked, certs not-run', () => {
+      assert.equal(row('dns').status, 'checked')
+      assert.equal(row('certs').status, 'not-run')
+    })
+    check('exposure provider unavailable is surfaced as such', () => {
+      assert.equal(row('exp-xon').status, 'unavailable')
+      assert.ok(row('exp-xon').detail.includes('blocked'))
+    })
+    check('platform probes aggregate found/not/blocked', () => {
+      assert.equal(cov.summary.platformsFound, 1)
+      assert.equal(cov.summary.platformsNone, 1)
+      assert.equal(cov.summary.platformsInconclusive, 1)
+    })
+    check('negative evidence keeps handle+platform', () => {
+      assert.deepEqual(
+        cov.summary.negativeEvidence.map((n) => `${n.handles[0]}@${n.platform}`),
+        ['jdoe@reddit']
+      )
+    })
+    check('reverse image always marked manual-only', () => {
+      assert.equal(row('reverse-image').status, 'manual')
+    })
+  }
 
   console.log(`\n${passed} checks passed${process.exitCode ? ' (with failures above)' : ''}`)
 })()

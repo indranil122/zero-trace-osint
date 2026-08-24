@@ -1,4 +1,7 @@
-const KIND_ORDER = ['domain', 'subdomain', 'nameserver', 'ip', 'email', 'username', 'account', 'breach', 'name', 'location', 'image', 'phone', 'note']
+import { overallScore } from './scoring.js'
+import { computeCoverage, coverageSentence } from './coverage.js'
+
+const KIND_ORDER = ['domain', 'subdomain', 'nameserver', 'ip', 'email', 'username', 'account', 'breach', 'risk', 'collection', 'name', 'location', 'image', 'phone', 'note']
 
 const KIND_TITLES = {
   domain: 'Domains',
@@ -9,6 +12,8 @@ const KIND_TITLES = {
   username: 'Usernames',
   account: 'Accounts',
   breach: 'Breaches',
+  risk: 'Risk Profiles',
+  collection: 'Collections',
   name: 'Names',
   location: 'Locations',
   image: 'Images',
@@ -92,6 +97,42 @@ export function buildReport({ caseName, nodes, edges, log, aiNarrative }, mode =
   L.push('')
   L.push(`This case contains ${nodes.length} entities (${statLine || 'none'}) connected by ${edges.length} relationships.`)
   L.push('')
+  try {
+    const { score, label } = overallScore(nodes)
+    if (score > 0 || nodes.some((n) => n.data.kind === 'breach')) {
+      L.push('## Risk Score')
+      L.push('')
+      L.push(`**${score}/100 — ${label.toUpperCase()}**`)
+      L.push('')
+    }
+  } catch {}
+
+  // Investigation Coverage + negative evidence + unavailable sources
+  try {
+    const cov = computeCoverage(nodes)
+    const word = { checked: 'Checked', unavailable: 'UNAVAILABLE', manual: 'Manual only', 'not-run': 'Not run' }
+    L.push('## Investigation Coverage')
+    L.push('')
+    L.push(coverageSentence(cov))
+    L.push('')
+    for (const r of cov.rows) {
+      L.push(`- **${r.label}** — ${word[r.status] || r.status}${r.detail ? ` — ${escMd(r.detail)}` : ''}`)
+    }
+    const unavail = cov.rows.filter((r) => r.status === 'unavailable')
+    if (unavail.length) {
+      L.push('')
+      L.push('_Unavailable sources mean the case is INCOMPLETE. Absence of findings from an unavailable source is not evidence of absence._')
+    }
+    if (cov.summary.negativeEvidence.length) {
+      L.push('')
+      L.push('### Negative evidence (checked, not found)')
+      L.push('')
+      for (const n of cov.summary.negativeEvidence) {
+        L.push(`- ${n.handles.map(escMd).join(', ')} — no account on **${n.platform}**`)
+      }
+    }
+    L.push('')
+  } catch {}
 
   L.push(isCtf ? '## Findings' : '## Entities & Evidence')
   L.push('')

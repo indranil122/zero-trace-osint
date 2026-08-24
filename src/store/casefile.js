@@ -38,6 +38,7 @@ function blankRecord(id, name) {
     edges: [],
     aiNarrative: '',
     log: [],
+    snapshots: [],
   }
 }
 
@@ -85,9 +86,15 @@ export const useCaseFile = create((set, get) => ({
   log: [],
   tasks: [],
   selectedNodeId: null,
+  selectedEdgeId: null,
   lastSavedAt: null,
   past: [],
   future: [],
+  snapshots: [],
+
+  selectEdge(id) {
+    set({ selectedEdgeId: id || null })
+  },
 
   snapshot() {
     const { nodes, edges, past } = get()
@@ -126,6 +133,51 @@ export const useCaseFile = create((set, get) => ({
     get().scheduleSave()
   },
 
+  createSnapshot(name) {
+    const { nodes, edges, snapshots } = get()
+    const snap = {
+      id: `snap-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      name: name || `Snapshot ${snapshots.length + 1}`,
+      at: Date.now(),
+      nodes: JSON.parse(JSON.stringify(nodes)),
+      edges: JSON.parse(JSON.stringify(edges)),
+    }
+    set({ snapshots: [...snapshots, snap] })
+    get().scheduleSave()
+    get().pushLog(`Snapshot created: ${snap.name} (${nodes.length} nodes)`, 'ok')
+    return snap.id
+  },
+
+  deleteSnapshot(id) {
+    set((s) => ({ snapshots: s.snapshots.filter((x) => x.id !== id) }))
+    get().scheduleSave()
+  },
+
+  restoreSnapshot(id) {
+    const snap = get().snapshots.find((s) => s.id === id)
+    if (!snap) return
+    get().snapshot()
+    set({ nodes: JSON.parse(JSON.stringify(snap.nodes)), edges: JSON.parse(JSON.stringify(snap.edges)) })
+    get().scheduleSave()
+    get().pushLog(`Restored snapshot: ${snap.name}`, 'ok')
+  },
+
+  diffSnapshots(aId, bId) {
+    const snaps = get().snapshots
+    const a = snaps.find((s) => s.id === aId)
+    const b = snaps.find((s) => s.id === bId)
+    if (!a || !b) return null
+    const aIds = new Set(a.nodes.map((n) => n.id))
+    const bIds = new Set(b.nodes.map((n) => n.id))
+    const added = b.nodes.filter((n) => !aIds.has(n.id))
+    const removed = a.nodes.filter((n) => !bIds.has(n.id))
+    const aEdgeKeys = new Set(a.edges.map((e) => `${e.source}|${e.target}`))
+    const bEdgeKeys = new Set(b.edges.map((e) => `${e.source}|${e.target}`))
+    const addedEdges = b.edges.filter((e) => !aEdgeKeys.has(`${e.source}|${e.target}`))
+    const removedEdges = a.edges.filter((e) => !bEdgeKeys.has(`${e.source}|${e.target}`))
+    return { added, removed, addedEdges, removedEdges, a, b }
+  },
+
   markSaved() {
     set({ lastSavedAt: new Date().toLocaleTimeString() })
   },
@@ -142,6 +194,7 @@ export const useCaseFile = create((set, get) => ({
       rec.edges = s.edges
       rec.aiNarrative = s.aiNarrative
       rec.log = s.log
+      rec.snapshots = s.snapshots || []
       rec.updatedAt = Date.now()
       recordCache.set(s.activeId, rec)
       saveCase(s.activeId, rec)
@@ -189,6 +242,7 @@ export const useCaseFile = create((set, get) => ({
         edges: rec.edges || [],
         aiNarrative: typeof rec.aiNarrative === 'string' ? rec.aiNarrative : '',
         log: Array.isArray(rec.log) ? rec.log : [],
+        snapshots: Array.isArray(rec.snapshots) ? rec.snapshots : [],
         lastSavedAt: new Date(rec.updatedAt || Date.now()).toLocaleTimeString(),
       })
     }
@@ -208,6 +262,7 @@ export const useCaseFile = create((set, get) => ({
       edges: rec.edges || [],
       aiNarrative: typeof rec.aiNarrative === 'string' ? rec.aiNarrative : '',
       log: Array.isArray(rec.log) ? rec.log : [],
+      snapshots: Array.isArray(rec.snapshots) ? rec.snapshots : [],
       selectedNodeId: null,
       tasks: [],
       past: [],
@@ -241,6 +296,7 @@ export const useCaseFile = create((set, get) => ({
       rec.edges = s.edges
       rec.aiNarrative = s.aiNarrative
       rec.log = s.log
+      rec.snapshots = s.snapshots
       rec.updatedAt = Date.now()
       saveCase(s.activeId, rec).catch(() => {})
     }
@@ -341,9 +397,56 @@ export const useCaseFile = create((set, get) => ({
       const edgeKeys = new Set(edges.map((e) => `${e.source}|${e.target}`))
       let parent = parentId ? byId.get(parentId) : undefined
 
+      // --- collection bucketing (kipi style) ---
+      const COLLECTION_THRESHOLD = 20
+      const counts = {}
+      for (const f of findings) if (f && f.kind && f.kind !== '@') counts[f.kind] = (counts[f.kind] || 0) + 1
+      const bucketKinds = Object.entries(counts).filter(([, c]) => c >= COLLECTION_THRESHOLD).map(([k]) => k)
+      const bucketed = new Set(bucketKinds)
+      if (bucketKinds.length) {
+        for (const kind of bucketKinds) {
+          const members = findings.filter((f) => f && f.kind === kind).map((f) => normalizeValue(kind, f.value)).filter(Boolean)
+          const unique = [...new Set(members)]
+          if (!unique.length) continue
+          const cid = `collection:${parentId || 'root'}:${kind}`
+          const existing = byId.get(cid)
+          const ev = {
+            at: Date.now(),
+            source: findings.find((f) => f.kind === kind)?.source || 'Collection',
+            detail: `${unique.length} ${kind}s collected`,
+            url: findings.find((f) => f.kind === kind)?.url,
+          }
+          if (existing) {
+            const merged = [...new Set([...(existing.data.members || []), ...unique])]
+            replaceNode(nodes, byId, existing, (d) => ({
+              ...d,
+              label: `${merged.length} ${kind}s`,
+              members: merged,
+              evidence: [...(d.evidence || []), ev],
+            }))
+          } else {
+            const position = placeAround(byId.size, parent)
+            const node = {
+              id: cid,
+              type: 'entity',
+              position,
+              data: { kind: 'collection', label: `${unique.length} ${kind}s`, notes: `Bucket for ${kind}`, evidence: [ev], members: unique, bucketKind: kind, parentId: parentId || null },
+            }
+            nodes.push(node)
+            byId.set(cid, node)
+            if (parent && !edgeKeys.has(`${parent.id}|${cid}`)) {
+              const edge = labeledEdge(parent.id, cid, parent.data.kind, 'collection')
+              edges.push(edge)
+              edgeKeys.add(`${parent.id}|${cid}`)
+            }
+          }
+        }
+      }
+
       let dnsIpIndex = 0
       for (const f of findings) {
         if (!f || typeof f !== 'object') continue
+        if (bucketed.has(f.kind)) continue
         const ev = {
           at: Date.now(),
           source: f.source || 'unknown',
@@ -398,6 +501,20 @@ export const useCaseFile = create((set, get) => ({
       return { nodes, edges }
     })
     get().scheduleSave()
+  },
+
+  expandCollection(collectionId) {
+    const s = get()
+    const col = s.nodes.find((n) => n.id === collectionId)
+    if (!col || col.data.kind !== 'collection' || !Array.isArray(col.data.members)) return
+    const kind = col.data.bucketKind || 'subdomain'
+    const findings = col.data.members.map((v) => ({ kind, value: v, source: 'Expanded from collection', detail: `From ${col.data.label}` }))
+    get().snapshot()
+    set((state) => ({
+      nodes: state.nodes.filter((n) => n.id !== collectionId),
+      edges: state.edges.filter((e) => e.source !== collectionId && e.target !== collectionId),
+    }))
+    get().addFindings(col.data.parentId || null, findings)
   },
 
   updateSelected(data) {
@@ -479,6 +596,7 @@ export const useCaseFile = create((set, get) => ({
         nodes: s.nodes,
         edges: s.edges,
         aiNarrative: s.aiNarrative,
+        snapshots: s.snapshots || [],
         exportedAt: new Date().toISOString(),
       },
       null,
@@ -531,6 +649,7 @@ export const useCaseFile = create((set, get) => ({
     rec.nodes = data.nodes
     rec.edges = Array.isArray(data.edges) ? data.edges : []
     rec.aiNarrative = typeof data.aiNarrative === 'string' ? data.aiNarrative : ''
+    rec.snapshots = Array.isArray(data.snapshots) ? data.snapshots : []
     recordCache.set(id, rec)
     saveCase(id, rec).catch(() => {})
     set((s) => ({ index: [lightEntry(rec), ...s.index] }))
