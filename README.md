@@ -270,9 +270,3 @@ Authorized research, CTFs, learning, and self-exposure checks only. Obey the law
 ### License
 
 MIT — see `LICENSE`. Free to use, copy, and learn from.
-
-### Keywords
-
-`osint` `recon` `osint-tool` `ctf` `security` `investigation` `graph` `browser-only` `privacy` `no-backend` `pwa` `react` `vite` `tailwindcss` `shadcn-ui` `lenis` `indexeddb` `certificate-transparency` `whois` `dns` `ttl` `wayback-machine` `exif` `breach` `exposure` `haveibeenpwned` `xposedornot` `hudson-rock` `infostealer` `phone-number-lookup` `phone-intel` `libphonenumber` `dork-generator` `veiltrace`
-
-Add these as GitHub Topics to help discovery.
